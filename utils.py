@@ -1,6 +1,7 @@
 import calendar
 from datetime import date, timedelta
 import re
+import os
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -14,6 +15,10 @@ from selenium.webdriver.firefox.service import Service as FirefoxService
 from webdriver_manager.firefox import GeckoDriverManager
 
 from selenium.webdriver.support.ui import Select
+
+os.environ['WDM_SSL_VERIFY'] = '0'
+os.environ['WDM_TIMEOUT'] = '5'
+
 def weekdays(year, month):
     dayList = []
 

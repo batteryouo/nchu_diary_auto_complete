@@ -2,6 +2,8 @@ import calendar
 from datetime import date, timedelta
 import re
 import os
+import platform
+from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -18,6 +20,22 @@ from selenium.webdriver.support.ui import Select
 
 os.environ['WDM_SSL_VERIFY'] = '0'
 os.environ['WDM_TIMEOUT'] = '5'
+
+def set_file_path():
+    # Detect the operating system
+    current_os = platform.system()
+    
+    # Path.home() returns the user's home directory (~ on Linux, C:\Users\Username on Windows)
+    home = Path.home()
+
+    if current_os == "Windows":
+        # Windows: Set to Desktop
+        file_path = home / "Desktop"
+    else:
+        # Linux/macOS: Set to Home (~)
+        file_path = home
+
+    return file_path
 
 def weekdays(year, month):
     dayList = []

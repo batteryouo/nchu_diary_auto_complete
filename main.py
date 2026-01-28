@@ -8,11 +8,27 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
 import time
 
 import utils
 
-DEBUG = False
+def wait_until_browser_closes(driver):
+    """
+    Pauses the script and monitors the browser window.
+    The script continues only after the browser is closed.
+    """
+    print("Program paused. Please perform manual actions. The script will resume after you close the browser...")
+    
+    try:
+        # Keep looping as long as there is at least one window handle active
+        while len(driver.window_handles) > 0:
+            time.sleep(1)  # Check every second to minimize CPU usage
+    except (WebDriverException, Exception):
+        # Exception occurs when the connection is lost or the browser is fully closed
+        pass
+
+    print("Browser closure detected. Finalizing the process.")
 
 def main():
     try:
@@ -85,6 +101,23 @@ def main():
             driver.find_element(By.ID, "btnSent").click()
             print(date_str)
             time.sleep(1)
+        roc_year = year - 1911
+        driver.switch_to.default_content()
+        driver.find_element(By.LINK_TEXT, "學習日誌列印").click()
+        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
+        utils.select_school_by_value(driver, school_value)
+
+        date_input = wait.until(EC.presence_of_element_located((By.ID, "dtQryBeg")))
+        date_input = driver.find_element(By.ID, "dtQryBeg")
+        date_input.clear()
+        date_input.send_keys(f"{roc_year}{month:02d}01")
+        time.sleep(0.5)                
+        date_input = wait.until(EC.presence_of_element_located((By.ID, "dtQryEnd")))
+        date_input = driver.find_element(By.ID, "dtQryEnd")
+        date_input.clear()
+        date_input.send_keys(f"{date_str}")
+        time.sleep(0.5)
+        driver.find_element(By.ID, "btnSent").click()
 
     except ValueError as e:
         print(str(e))
@@ -92,20 +125,9 @@ def main():
         return
 
     finally:
-        if DEBUG:
-            try:
-                while True:
-                    print("waiting...", end="\r\b")
-                    time.sleep(1)
-
-            except KeyboardInterrupt:
-                print("\nrecieve the exit signal...")
-            finally:
-                print("exit")
-        else:
-            time.sleep(5)
-            driver.quit()
-            print("Done!")            
+        wait_until_browser_closes(driver)
+        driver.quit()
+        print("Done!")            
 
 if __name__ == "__main__":
     main()

@@ -105,7 +105,6 @@ def main():
         print(f"Selected school value: {school_value}")
 
         for day in weekdays:
-
             content = utils.data_pack(day)
             work_content = content["work"]
             date_str = content["date"]

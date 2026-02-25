@@ -1,11 +1,7 @@
 from datetime import datetime
 import json
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
+
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
@@ -13,6 +9,7 @@ import time
 
 import utils
 import user_ui
+from selenium.webdriver.support.ui import Select
 
 def wait_until_browser_closes(driver):
     """
@@ -32,19 +29,17 @@ def wait_until_browser_closes(driver):
     print("Browser closure detected. Finalizing the process.")
 
 def main():
+    # 1. First UI: Login Credentials
     if not user_ui.run_login_ui():
-        print("Login cancelled by user.")
         return
+    
     try:
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
     except FileNotFoundError:
         print("Error: config.json not found.")
         return 
-    
-    your_id = config['id']
-    your_pw = config['pw']
-    school_value = config["school_value"]
+
     use_custom_date = config.get("use_custom_date", False)
 
     if use_custom_date:
@@ -68,15 +63,29 @@ def main():
     time.sleep(2)
     
     try:
-        driver.find_element(By.ID, "txtLoginID").send_keys(your_id)
-        driver.find_element(By.ID, "txtLoginPWD").send_keys(your_pw)
+        driver.find_element(By.ID, "txtLoginID").send_keys(config['id'])
+        driver.find_element(By.ID, "txtLoginPWD").send_keys(config['pw'])
         driver.find_element(By.ID, "button").click()
         time.sleep(1)
         driver.find_element(By.LINK_TEXT, "學習日誌").click()
         wait = WebDriverWait(driver, 10)
         wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
         print("switch to iframe!")
+
+        # 2. Second UI: School Selection (Triggered inside the process)
+        select_element = driver.find_element(By.NAME, "schno")
+        select_obj = Select(select_element)
+        available_options = [opt.get_attribute("value") for opt in select_obj.options if opt.get_attribute("value")]
+
+        if not user_ui.run_school_select_ui(available_options):
+            print("Selection cancelled.")
+            return 
+        # Reload config to get the selected school_value
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
         existing_dates = utils.get_existing_dates(driver)
+
+        school_value = config["school_value"]
         utils.select_school_by_value(driver, school_value)
         print(f"Selected school value: {school_value}")
 

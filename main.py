@@ -12,6 +12,7 @@ from selenium.common.exceptions import WebDriverException
 import time
 
 import utils
+import user_ui
 
 def wait_until_browser_closes(driver):
     """
@@ -31,6 +32,9 @@ def wait_until_browser_closes(driver):
     print("Browser closure detected. Finalizing the process.")
 
 def main():
+    if not user_ui.run_login_ui():
+        print("Login cancelled by user.")
+        return
     try:
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
@@ -99,7 +103,7 @@ def main():
             time.sleep(0.5)
 
             driver.find_element(By.ID, "btnSent").click()
-            print(date_str)
+            print("\033[F\033", date_str, sep='')
             time.sleep(1)
         roc_year = year - 1911
         driver.switch_to.default_content()

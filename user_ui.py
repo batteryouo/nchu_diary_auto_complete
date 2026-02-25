@@ -25,7 +25,7 @@ class BaseUI:
 
 class LoginUI(BaseUI):
     def __init__(self):
-        super().__init__("NCHU Login", "300x200")
+        super().__init__("NCHU Login", "300x250")
         tk.Label(self.root, text="Student ID:").pack(pady=(10, 0))
         self.entry_id = tk.Entry(self.root)
         self.entry_id.pack(pady=5)
@@ -34,9 +34,20 @@ class LoginUI(BaseUI):
         self.entry_pw = tk.Entry(self.root, show="*")
         self.entry_pw.pack(pady=5)
 
-        tk.Button(self.root, text="Login", command=self.submit).pack(pady=20)
+        # Logic: Checkbox to decide whether to skip subsequent UIs
+        self.force_manual_var = tk.BooleanVar(value=False)
+        self.chk_manual = tk.Checkbutton(
+            self.root, 
+            text="不使用預設設定檔", 
+            variable=self.force_manual_var
+        )
+        self.chk_manual.pack(pady=5)
+
+        tk.Button(self.root, text="Login", command=self.submit).pack(pady=10)
         
-        # Load default values
+        # Result placeholder
+        self.force_manual_result = False
+        
         config = self.load_config_data()
         self.entry_id.insert(0, config.get('id', ''))
         self.entry_pw.insert(0, config.get('pw', ''))
@@ -48,6 +59,7 @@ class LoginUI(BaseUI):
             return
         self.save_config_data({'id': self.entry_id.get(), 'pw': self.entry_pw.get()})
         self.success = True
+        self.force_manual_result = self.force_manual_var.get()
         self.root.destroy()
 
 class SchoolSelectUI(BaseUI):
@@ -62,7 +74,6 @@ class SchoolSelectUI(BaseUI):
 
         tk.Button(self.root, text="Confirm", command=self.submit).pack(pady=15)
 
-        # Set default value
         config = self.load_config_data()
         saved_val = config.get('school_value', '')
         if saved_val in self.options:
@@ -83,7 +94,8 @@ class SchoolSelectUI(BaseUI):
 
 def run_login_ui():
     app = LoginUI()
-    return app.success
+    # Return both login success and the "Force Manual" flag
+    return app.success, app.force_manual_result
 
 def run_school_select_ui(options):
     app = SchoolSelectUI(options)

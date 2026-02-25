@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -10,6 +11,8 @@ import time
 import utils
 import user_ui
 from selenium.webdriver.support.ui import Select
+
+CONFIG_FILE = "config.json"
 
 def wait_until_browser_closes(driver):
     """
@@ -29,15 +32,18 @@ def wait_until_browser_closes(driver):
     print("Browser closure detected. Finalizing the process.")
 
 def main():
-    # 1. First UI: Login Credentials
-    if not user_ui.run_login_ui():
+    # 1. First UI: Login Credentials (Always shown)
+    login_success, force_manual = user_ui.run_login_ui()
+    
+    if not login_success:
+        print("Exit: Login UI closed.")
         return
     
     try:
-        with open('config.json', 'r', encoding='utf-8') as f:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             config = json.load(f)
     except FileNotFoundError:
-        print("Error: config.json not found.")
+        print(f"Error: {CONFIG_FILE} not found.")
         return 
 
     use_custom_date = config.get("use_custom_date", False)
@@ -76,13 +82,22 @@ def main():
         select_element = driver.find_element(By.NAME, "schno")
         select_obj = Select(select_element)
         available_options = [opt.get_attribute("value") for opt in select_obj.options if opt.get_attribute("value")]
+        has_school_data = "school_value" in config and config["school_value"]
 
-        if not user_ui.run_school_select_ui(available_options):
-            print("Selection cancelled.")
-            return 
-        # Reload config to get the selected school_value
-        with open('config.json', 'r', encoding='utf-8') as f:
-            config = json.load(f)
+        if len(available_options) == 1:
+            config["school_value"] = available_options[0]
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        elif force_manual or not has_school_data:
+            if not user_ui.run_school_select_ui(available_options):
+                print("Selection cancelled.")
+                return 
+            # Refresh config after UI save
+            with open('config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        else:
+            print("Using default profile: Skipping school selection UI.")
+
         existing_dates = utils.get_existing_dates(driver)
 
         school_value = config["school_value"]

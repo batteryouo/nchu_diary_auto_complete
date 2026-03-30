@@ -32,129 +32,165 @@ def wait_until_browser_closes(driver):
     print("Browser closure detected. Finalizing the process.")
 
 def main():
-    # 1. First UI: Login Credentials (Always shown)
-    login_success, force_manual = user_ui.run_login_ui()
-    
-    if not login_success:
-        print("Exit: Login UI closed.")
+  # ===== 1. Login UI =====
+  login_success, force_manual = user_ui.run_login_ui()
+
+  if not login_success:
+    print("Exit: Login UI closed.")
+    return
+
+  # ===== 2. Load config =====
+  try:
+    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+      config = json.load(f)
+  except FileNotFoundError:
+    print(f"Error: {CONFIG_FILE} not found.")
+    return
+
+  use_custom_date = config.get("use_custom_date", False)
+
+  if use_custom_date:
+    year = config["custom_year"]
+    month = config["custom_month"]
+    print(f"Using custom date: {year}/{month:02d}")
+  else:
+    now = datetime.now()
+    year = now.year
+    month = now.month
+    print(f"Using current date: {year}/{month:02d}")
+
+  # ===== 3. Start browser =====
+  driver = utils.get_driver()
+  driver.get("https://psf.nchu.edu.tw/punch/index.jsp")
+
+  time.sleep(2)
+
+  try:
+    # ===== 4. Login =====
+    driver.find_element(By.ID, "txtLoginID").send_keys(config['id'])
+    driver.find_element(By.ID, "txtLoginPWD").send_keys(config['pw'])
+    driver.find_element(By.ID, "button").click()
+
+    time.sleep(1)
+
+    driver.find_element(By.LINK_TEXT, "學習日誌").click()
+
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
+
+    # ===== 5. School selection =====
+    select_element = driver.find_element(By.NAME, "schno")
+    select_obj = Select(select_element)
+
+    available_options = [
+      opt.get_attribute("value")
+      for opt in select_obj.options
+      if opt.get_attribute("value")
+    ]
+
+    has_school_data = "school_value" in config and config["school_value"]
+
+    if len(available_options) == 1:
+      config["school_value"] = available_options[0]
+      with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
+
+    elif force_manual or not has_school_data:
+      if not user_ui.run_school_select_ui(available_options):
+        print("Selection cancelled.")
         return
-    
-    try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: {CONFIG_FILE} not found.")
-        return 
 
-    use_custom_date = config.get("use_custom_date", False)
+      with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        config = json.load(f)
 
-    if use_custom_date:
-        year = config["custom_year"]
-        month = config["custom_month"]
-        print(f"Using custom date: {year} / {month:02d}")
     else:
-        now = datetime.now()
-        year = now.year
-        month = now.month
-        print(f"Using current date: {year} / {month:02d}")
+      print("Using saved school value")
 
-    print(f"{year} / {month:02d}")
+    # ===== 6. Get existing dates =====
+    existing_dates = utils.get_existing_dates(driver)
 
-    weekdays = utils.weekdays(year=year, month=month)
-    print(weekdays)
+    school_value = config["school_value"]
+    utils.select_school_by_value(driver, school_value)
 
-    driver = utils.get_driver()
-    driver.get("https://psf.nchu.edu.tw/punch/index.jsp")
+    print(f"Selected school: {school_value}")
 
-    time.sleep(2)
-    
-    try:
-        driver.find_element(By.ID, "txtLoginID").send_keys(config['id'])
-        driver.find_element(By.ID, "txtLoginPWD").send_keys(config['pw'])
-        driver.find_element(By.ID, "button").click()
-        time.sleep(1)
-        driver.find_element(By.LINK_TEXT, "學習日誌").click()
-        wait = WebDriverWait(driver, 10)
-        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
-        print("switch to iframe!")
+    # ===== 7. Date selection UI (NEW) =====
+# ===== 7. Date selection UI =====
+    # Passing year, month, and the list of already filled dates to the UI
+    success, selected_dates = user_ui.run_date_multi_select_ui(year, month, existing_dates)
 
-        # 2. Second UI: School Selection (Triggered inside the process)
-        select_element = driver.find_element(By.NAME, "schno")
-        select_obj = Select(select_element)
-        available_options = [opt.get_attribute("value") for opt in select_obj.options if opt.get_attribute("value")]
-        has_school_data = "school_value" in config and config["school_value"]
-
-        if len(available_options) == 1:
-            config["school_value"] = available_options[0]
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-        elif force_manual or not has_school_data:
-            if not user_ui.run_school_select_ui(available_options):
-                print("Selection cancelled.")
-                return 
-            # Refresh config after UI save
-            with open('config.json', 'r', encoding='utf-8') as f:
-                config = json.load(f)
-        else:
-            print("Using default profile: Skipping school selection UI.")
-
-        existing_dates = utils.get_existing_dates(driver)
-
-        school_value = config["school_value"]
-        utils.select_school_by_value(driver, school_value)
-        print(f"Selected school value: {school_value}")
-        user_ui.run_date_select_ui()
-        for day in weekdays:
-            content = utils.data_pack(day)
-            work_content = content["work"]
-            date_str = content["date"]
-            if date_str in existing_dates:
-                print(f"Skip existing date: {date_str}")
-                continue
-
-            wait = WebDriverWait(driver, 10)
-            date_input = wait.until(EC.presence_of_element_located((By.ID, "date")))
-
-            date_input = driver.find_element(By.ID, "date")
-            date_input.clear()
-            date_input.send_keys(date_str)
-            time.sleep(0.5)
-
-            work_input = driver.find_element(By.ID, "work")
-            work_input.clear()
-            work_input.send_keys(work_content)
-            time.sleep(0.5)
-
-            driver.find_element(By.ID, "btnSent").click()
-            print("\033[F\033", date_str, sep='')
-            time.sleep(1)
-        roc_year = year - 1911
-        driver.switch_to.default_content()
-        driver.find_element(By.LINK_TEXT, "學習日誌列印").click()
-        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
-        utils.select_school_by_value(driver, school_value)
-
-        date_input = wait.until(EC.presence_of_element_located((By.ID, "dtQryBeg")))
-        date_input = driver.find_element(By.ID, "dtQryBeg")
-        date_input.clear()
-        date_input.send_keys(f"{roc_year}{month:02d}01")
-        time.sleep(0.5)                
-        date_input = wait.until(EC.presence_of_element_located((By.ID, "dtQryEnd")))
-        date_input = driver.find_element(By.ID, "dtQryEnd")
-        date_input.clear()
-        date_input.send_keys(f"{date_str}")
-        time.sleep(0.5)
-        driver.find_element(By.ID, "btnSent").click()
-
-    except ValueError as e:
-        print(str(e))
-        driver.quit()
+    if not success:
+        print("Date selection cancelled")
         return
 
-    finally:
-        wait_until_browser_closes(driver)
-        driver.quit()
-        print("Done!")            
+    # Sort dates to ensure they are submitted in order
+    selected_dates.sort()
+
+    # ===== 8. Fill data =====
+    last_processed_date = ""
+    for date_str_iso in selected_dates:
+        day_obj = datetime.strptime(date_str_iso, "%Y-%m-%d").date()
+
+        content = utils.data_pack(day_obj)
+        work_content = content["work"]
+        date_str = content["date"] # This is the ROC format string
+
+        # Double check existence (though UI already filters most)
+        if date_str in existing_dates:
+            print(f"Skip existing: {date_str}")
+            continue
+
+        date_input = wait.until(EC.presence_of_element_located((By.ID, "date")))
+        date_input.clear()
+        date_input.send_keys(date_str)
+
+        work_input = driver.find_element(By.ID, "work")
+        work_input.clear()
+        work_input.send_keys(work_content)
+
+        driver.find_element(By.ID, "btnSent").click()
+        print(f"Submitted: {date_str}")
+        last_processed_date = date_str
+        time.sleep(1)
+
+    # Update end date for report if data was submitted
+    final_report_date = last_processed_date if last_processed_date else content["date"]
+    # ===== 9. Print report =====
+    roc_year = year - 1911
+
+    driver.switch_to.default_content()
+    driver.find_element(By.LINK_TEXT, "學習日誌列印").click()
+
+    wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
+
+    utils.select_school_by_value(driver, school_value)
+
+    # Start date = first day of month
+    start_input = driver.find_element(By.ID, "dtQryBeg")
+    start_input.clear()
+    start_input.send_keys(f"{roc_year}{month:02d}01")
+
+    # End date = last selected date
+    end_input = driver.find_element(By.ID, "dtQryEnd")
+    end_input.clear()
+    end_input.send_keys(content["date"])
+    # end_input.send_keys(final_report_date)
+
+    driver.find_element(By.ID, "btnSent").click()
+
+  except ValueError as e:
+    print(str(e))
+    
+    import traceback
+    traceback.print_exc()
+
+    driver.quit()
+    return
+
+  finally:
+    wait_until_browser_closes(driver)
+    driver.quit()
+    print("Done!")           
 
 if __name__ == "__main__":
     main()

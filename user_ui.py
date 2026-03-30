@@ -130,76 +130,124 @@ class DateSelectUI(BaseUI):
         self.root.destroy()
 
 class DateMultiSelectUI(BaseUI):
-    def __init__(self, year, month):
-        super().__init__("Select Dates", "350x450")
+    def __init__(self, year, month, existing_dates):
+        super().__init__("Select Dates", "600x500")
+        self.year = year
+        self.month = month
+        self.existing_dates = existing_dates # ROC format strings
         self.selected_dates = []
         
-        tk.Label(self.root, text=f"請勾選要執行的日期 ({year}/{month:02d}):", font=("Arial", 10)).pack(pady=10)
-        self.start_date = tk.StringVar(value=f"{year}-{month:02d}-01")
+        # UI Layout: Left (Calendar), Right (Controls)
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        frame_top = tk.Frame(self.root)
-        frame_top.pack(pady=5)
+        # 1. Calendar (Left)
+        self.cal = Calendar(self.root, selectmode='day', 
+                            year=self.year, month=self.month,
+                            cursor="hand2")
+        self.cal.pack(side="left", fill="both", expand=True, padx=5)
 
-        self.use_recent_15 = tk.BooleanVar(value=False)
-        chk = tk.Checkbutton(frame_top, text="使用最近15個工作日", variable=self.use_recent_15)
-        chk.grid(row=0, column=0, columnspan=2, pady=5)
+        # 2. Control Panel (Right)
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(side="right", fill="y", padx=5)
 
- 
-        tk.Label(frame_top, text="起始日:").grid(row=1, column=0)
-        self.entry_start = tk.Entry(frame_top, textvariable=self.start_date, width=15)
-        self.entry_start.grid(row=1, column=1)
+        # Auto-select settings
+        self.auto_select_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(control_frame, text="Auto-select N days", 
+                       variable=self.auto_select_var).pack(anchor="w")
 
-        # Create a scrollable listbox for multiple selection
-        frame = tk.Frame(self.root)
-        frame.pack(pady=5, fill="both", expand=True)
+        tk.Label(control_frame, text="N (Days):").pack(anchor="w")
+        self.n_days_entry = tk.Entry(control_frame, width=10)
+        self.n_days_entry.insert(0, "15")
+        self.n_days_entry.pack(anchor="w", pady=5)
 
-        scrollbar = tk.Scrollbar(frame, orient="vertical")
-        self.listbox = tk.Listbox(frame, selectmode="multiple", yscrollcommand=scrollbar.set, font=("Courier New", 10))
+        self.skip_weekend_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(control_frame, text="Skip Weekends", 
+                       variable=self.skip_weekend_var).pack(anchor="w")
+
+        # Selection Display
+        tk.Label(control_frame, text="Current Selected:").pack(anchor="w", pady=(10, 0))
+        self.selection_label = tk.Label(control_frame, text="0 days", fg="blue")
+        self.selection_label.pack(anchor="w")
+
+        # Buttons
+        tk.Button(control_frame, text="Apply Auto Logic", command=self.apply_auto_logic, 
+                  bg="#e1e1e1").pack(fill="x", pady=5)
         
-        scrollbar.config(command=self.listbox.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.listbox.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        tk.Button(control_frame, text="Confirm & Submit", command=self.submit, 
+                  bg="#4CAF50", fg="white").pack(fill="x", side="bottom", pady=10)
 
-        # Generate weekdays for the given month
-        _, num_days = calendar.monthrange(year, month)
-        for day in range(1, num_days + 1):
-            date_obj = date(year, month, day)
-            # Only add weekdays (0-4 = Mon-Fri)
-            if date_obj.weekday() < 5:
-                # Format: 2026-02-01 (Mon)
-                display_str = date_obj.strftime("%Y-%m-%d (%a)")
-                self.listbox.insert(tk.END, display_str)
-
-        tk.Button(self.root, text="確認選擇", command=self.submit).pack(pady=15)
+        # Manual Click Binding
+        self.cal.bind("<<CalendarSelected>>", self.on_date_click)
+        
+        # Initial logic trigger
+        if self.auto_select_var.get():
+            self.apply_auto_logic()
+        
         self.root.mainloop()
 
-    def submit(self):
-        if self.use_recent_15.get():
-            try:
-                start = date.fromisoformat(self.start_date.get())
-            except Exception:
-                messagebox.showwarning("Warning", "日期格式錯誤 (YYYY-MM-DD)")
-                return
-
-            today = date.today()
-            result = []
-            current = today
-
-            while len(result) < 15 and current >= start:
-                if current.weekday() < 5:
-                    result.append(current.strftime("%Y-%m-%d"))
-                current -= timedelta(days=1)
-
-            self.selected_dates = list(reversed(result))
-
+    def on_date_click(self, event=None):
+        """Toggle manual date selection"""
+        selected_date = self.cal.selection_get()
+        iso_str = selected_date.strftime("%Y-%m-%d")
+        
+        if iso_str in self.selected_dates:
+            self.selected_dates.remove(iso_str)
+            self.cal.calevent_remove(date=selected_date)
         else:
-            indices = self.listbox.curselection()
-            self.selected_dates = [self.listbox.get(i).split(" ")[0] for i in indices]
+            self.selected_dates.append(iso_str)
+            self.cal.calevent_create(selected_date, 'selected', 'selected')
+            self.cal.tag_config('selected', background='red', foreground='white')
+        
+        self.update_display()
 
-            if not self.selected_dates:
-                messagebox.showwarning("Warning", "請至少選擇一天")
+    def apply_auto_logic(self):
+        """Automatically pick dates based on rules"""
+        # Clear existing
+        for d_str in self.selected_dates:
+            self.cal.calevent_remove(date=date.fromisoformat(d_str))
+        self.selected_dates = []
+
+        try:
+            n_target = int(self.n_days_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "N must be a number")
+            return
+
+        skip_weekend = self.skip_weekend_var.get()
+        _, num_days = calendar.monthrange(self.year, self.month)
+        
+        count = 0
+        for day in range(1, num_days + 1):
+            if count >= n_target:
+                break
+            
+            cur_date = date(self.year, self.month, day)
+            roc_str = f"{cur_date.year-1911:03d}{cur_date.month:02d}{cur_date.day:02d}"
+            
+            # Condition: Not weekend (if checked) and not already in existing_dates
+            is_weekend = cur_date.weekday() >= 5
+            if skip_weekend and is_weekend:
+                continue
+            
+            if roc_str in self.existing_dates:
+                continue
+                
+            iso_str = cur_date.strftime("%Y-%m-%d")
+            self.selected_dates.append(iso_str)
+            self.cal.calevent_create(cur_date, 'selected', 'selected')
+            count += 1
+            
+        self.cal.tag_config('selected', background='red', foreground='white')
+        self.update_display()
+
+    def update_display(self):
+        self.selection_label.config(text=f"{len(self.selected_dates)} days")
+
+    def submit(self):
+        if not self.selected_dates:
+            if not messagebox.askyesno("Warning", "No dates selected. Proceed?"):
                 return
-
         self.success = True
         self.root.destroy()
 
@@ -216,6 +264,6 @@ def run_date_select_ui():
     app = DateSelectUI()
     return app.success, app.selected_year, app.selected_month
 
-def run_date_multi_select_ui(year, month):
-    app = DateMultiSelectUI(year, month)
+def run_date_multi_select_ui(year, month, existing_dates):
+    app = DateMultiSelectUI(year, month, existing_dates)
     return app.success, app.selected_dates

@@ -30,11 +30,11 @@ class BaseUI:
 class LoginUI(BaseUI):
     def __init__(self):
         super().__init__("NCHU Login", "300x250")
-        tk.Label(self.root, text="Student ID:").pack(pady=(10, 0))
+        tk.Label(self.root, text="身分證字號:").pack(pady=(10, 0))
         self.entry_id = tk.Entry(self.root)
         self.entry_id.pack(pady=5)
 
-        tk.Label(self.root, text="Password:").pack(pady=(10, 0))
+        tk.Label(self.root, text="出生年月日(e.g. 900928):").pack(pady=(10, 0))
         self.entry_pw = tk.Entry(self.root, show="*")
         self.entry_pw.pack(pady=5)
 
@@ -202,8 +202,8 @@ class DateMultiSelectUI(BaseUI):
         self.update_display()
 
     def apply_auto_logic(self):
-        """Automatically pick dates based on rules"""
-        # Clear existing
+        """Automatically pick dates based on rules, including existing dates in the count."""
+        # Clear current UI selection highlights
         for d_str in self.selected_dates:
             self.cal.calevent_remove(date=date.fromisoformat(d_str))
         self.selected_dates = []
@@ -217,26 +217,33 @@ class DateMultiSelectUI(BaseUI):
         skip_weekend = self.skip_weekend_var.get()
         _, num_days = calendar.monthrange(self.year, self.month)
         
-        count = 0
+        # This counter tracks both existing logs and new selections
+        total_count = 0
+        
         for day in range(1, num_days + 1):
-            if count >= n_target:
+            if total_count >= n_target:
                 break
             
             cur_date = date(self.year, self.month, day)
             roc_str = f"{cur_date.year-1911:03d}{cur_date.month:02d}{cur_date.day:02d}"
             
-            # Condition: Not weekend (if checked) and not already in existing_dates
+            # Check if it's a weekend
             is_weekend = cur_date.weekday() >= 5
             if skip_weekend and is_weekend:
                 continue
             
+            # If the date already exists in the system:
+            # We count it towards the N limit, but don't add it to 'selected_dates' 
+            # because main.py doesn't need to submit it again.
             if roc_str in self.existing_dates:
+                total_count += 1
                 continue
                 
+            # If it's a valid new date to fill
             iso_str = cur_date.strftime("%Y-%m-%d")
             self.selected_dates.append(iso_str)
             self.cal.calevent_create(cur_date, 'selected', 'selected')
-            count += 1
+            total_count += 1
             
         self.cal.tag_config('selected', background='red', foreground='white')
         self.update_display()

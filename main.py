@@ -64,7 +64,7 @@ def main():
   driver = utils.get_driver()
   driver.get("https://psf.nchu.edu.tw/punch/index.jsp")
 
-  time.sleep(2)
+  time.sleep(1)
 
   try:
     # ===== 4. Login =====
@@ -117,7 +117,7 @@ def main():
 
     # ===== 7. Date selection UI  =====
     # Passing year, month, and the list of already filled dates to the UI
-    success, selected_dates = user_ui.run_date_multi_select_ui(year, month, existing_dates)
+    success, selected_dates, final_year, final_month = user_ui.run_date_multi_select_ui(year, month, existing_dates)
 
     if not success:
         print("Date selection cancelled")
@@ -154,33 +154,31 @@ def main():
         print("No new dates selected. Proceeding to report generation.")
 
     # ===== 9. Print report =====
-    roc_year = year - 1911
+    # Use final_year and final_month returned from the UI
+    roc_year = final_year - 1911
+
     driver.switch_to.default_content()
     driver.find_element(By.LINK_TEXT, "學習日誌列印").click()
 
     wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
     utils.select_school_by_value(driver, school_value)
 
-    # 1. Start date = First day of the target month
+    # Start date = 1st day of the UI-selected month
     start_input = driver.find_element(By.ID, "dtQryBeg")
     start_input.clear()
-    start_input.send_keys(f"{roc_year}{month:02d}01")
+    start_input.send_keys(f"{roc_year}{final_month:02d}01")
 
-    # 2. End date logic:
-    # If custom date is used, end at the last day of that month.
-    # If current date is used, end at today.
+    # End date = Last day of the UI-selected month (or Today if it's the current month)
+    now = datetime.now()
+    if final_year == now.year and final_month == now.month:
+        report_end_str = f"{roc_year}{final_month:02d}{now.day:02d}"
+    else:
+        _, last_day = calendar.monthrange(final_year, final_month)
+        report_end_str = f"{roc_year}{final_month:02d}{last_day:02d}"
+
     end_input = driver.find_element(By.ID, "dtQryEnd")
     end_input.clear()
-
-    if use_custom_date:
-        _, last_day = calendar.monthrange(year, month)
-        report_end_str = f"{roc_year}{month:02d}{last_day:02d}"
-    else:
-        now = datetime.now()
-        report_end_str = f"{now.year - 1911}{now.month:02d}{now.day:02d}"
-
     end_input.send_keys(report_end_str)
-    print(f"Generating report from {roc_year}{month:02d}01 to {report_end_str}")
 
     driver.find_element(By.ID, "btnSent").click()
 

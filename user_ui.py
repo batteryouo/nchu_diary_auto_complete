@@ -155,7 +155,6 @@ class DateMultiSelectUI(BaseUI):
         # 2. Control Panel (Right)
         control_frame = tk.Frame(self.root)
         control_frame.pack(side="right", fill="y", padx=5)
-
         # Auto-select settings
         self.auto_select_var = tk.BooleanVar(value=True)
         tk.Checkbutton(control_frame, text="Auto-select N days", 
@@ -184,6 +183,9 @@ class DateMultiSelectUI(BaseUI):
         # Manual Click Binding
         self.cal.bind("<<CalendarSelected>>", self.on_date_click)
         
+        # Bind month change event
+        self.cal.bind("<<CalendarMonthChanged>>", self.on_month_changed)
+
         # Initial logic trigger
         if self.auto_select_var.get():
             self.apply_auto_logic()
@@ -204,6 +206,18 @@ class DateMultiSelectUI(BaseUI):
             self.cal.tag_config('selected', background='red', foreground='white')
         
         self.update_display()
+    def on_month_changed(self, event):
+        """Update logic when user navigates to a different month/year in the calendar"""
+        # Get the displayed month and year from the calendar widget
+        displayed_date = self.cal.get_displayed_month() # returns (month, year)
+        self.month = displayed_date[0]
+        self.year = displayed_date[1]
+        
+        print(f"Calendar view changed to: {self.year}/{self.month:02d}")
+        
+        # Optional: Auto-re-run logic when month changes
+        if self.auto_select_var.get():
+            self.apply_auto_logic()
 
     def apply_auto_logic(self):
         """Automatically pick dates based on rules, including existing dates in the count."""
@@ -261,9 +275,17 @@ class DateMultiSelectUI(BaseUI):
         self.selection_label.config(text=f"{len(self.selected_dates)} days")
 
     def submit(self):
-        if not self.selected_dates:
-            if not messagebox.askyesno("Warning", "No dates selected. Proceed?"):
+        if not self.selected_dates and not self.auto_select_var.get():
+            if not messagebox.askyesno("Warning", "No dates selected. Proceed anyway?"):
                 return
+
+        # Update the config to match the calendar's current view
+        self.save_config_data({
+            "custom_year": self.year,
+            "custom_month": self.month,
+            "use_custom_date": True  # Force use of the UI-selected month
+        })
+        
         self.success = True
         self.root.destroy()
 
@@ -282,4 +304,4 @@ def run_date_select_ui():
 
 def run_date_multi_select_ui(year, month, existing_dates):
     app = DateMultiSelectUI(year, month, existing_dates)
-    return app.success, app.selected_dates
+    return app.success, app.selected_dates, app.year, app.month

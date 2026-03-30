@@ -1,3 +1,4 @@
+import calendar
 from datetime import datetime
 import json
 import os
@@ -114,67 +115,72 @@ def main():
 
     print(f"Selected school: {school_value}")
 
-    # ===== 7. Date selection UI (NEW) =====
-# ===== 7. Date selection UI =====
+    # ===== 7. Date selection UI  =====
     # Passing year, month, and the list of already filled dates to the UI
     success, selected_dates = user_ui.run_date_multi_select_ui(year, month, existing_dates)
 
     if not success:
         print("Date selection cancelled")
         return
-
-    # Sort dates to ensure they are submitted in order
-    selected_dates.sort()
-
     # ===== 8. Fill data =====
-    last_processed_date = ""
-    for date_str_iso in selected_dates:
-        day_obj = datetime.strptime(date_str_iso, "%Y-%m-%d").date()
+    last_processed_date = None
+    
+    # Process only if selected_dates is not empty
+    if selected_dates:
+        selected_dates.sort()
+        for date_str_iso in selected_dates:
+            day_obj = datetime.strptime(date_str_iso, "%Y-%m-%d").date()
+            content = utils.data_pack(day_obj)
+            work_content = content["work"]
+            date_str = content["date"]
 
-        content = utils.data_pack(day_obj)
-        work_content = content["work"]
-        date_str = content["date"] # This is the ROC format string
+            if date_str in existing_dates:
+                print(f"Skip existing: {date_str}")
+                continue
 
-        # Double check existence (though UI already filters most)
-        if date_str in existing_dates:
-            print(f"Skip existing: {date_str}")
-            continue
+            date_input = wait.until(EC.presence_of_element_located((By.ID, "date")))
+            date_input.clear()
+            date_input.send_keys(date_str)
 
-        date_input = wait.until(EC.presence_of_element_located((By.ID, "date")))
-        date_input.clear()
-        date_input.send_keys(date_str)
+            work_input = driver.find_element(By.ID, "work")
+            work_input.clear()
+            work_input.send_keys(work_content)
 
-        work_input = driver.find_element(By.ID, "work")
-        work_input.clear()
-        work_input.send_keys(work_content)
+            driver.find_element(By.ID, "btnSent").click()
+            print(f"Submitted: {date_str}")
+            last_processed_date = date_str
+            time.sleep(1)
+    else:
+        print("No new dates selected. Proceeding to report generation.")
 
-        driver.find_element(By.ID, "btnSent").click()
-        print(f"Submitted: {date_str}")
-        last_processed_date = date_str
-        time.sleep(1)
-
-    # Update end date for report if data was submitted
-    final_report_date = last_processed_date if last_processed_date else content["date"]
     # ===== 9. Print report =====
     roc_year = year - 1911
-
     driver.switch_to.default_content()
     driver.find_element(By.LINK_TEXT, "學習日誌列印").click()
 
     wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
-
     utils.select_school_by_value(driver, school_value)
 
-    # Start date = first day of month
+    # 1. Start date = First day of the target month
     start_input = driver.find_element(By.ID, "dtQryBeg")
     start_input.clear()
     start_input.send_keys(f"{roc_year}{month:02d}01")
 
-    # End date = last selected date
+    # 2. End date logic:
+    # If custom date is used, end at the last day of that month.
+    # If current date is used, end at today.
     end_input = driver.find_element(By.ID, "dtQryEnd")
     end_input.clear()
-    end_input.send_keys(content["date"])
-    # end_input.send_keys(final_report_date)
+
+    if use_custom_date:
+        _, last_day = calendar.monthrange(year, month)
+        report_end_str = f"{roc_year}{month:02d}{last_day:02d}"
+    else:
+        now = datetime.now()
+        report_end_str = f"{now.year - 1911}{now.month:02d}{now.day:02d}"
+
+    end_input.send_keys(report_end_str)
+    print(f"Generating report from {roc_year}{month:02d}01 to {report_end_str}")
 
     driver.find_element(By.ID, "btnSent").click()
 

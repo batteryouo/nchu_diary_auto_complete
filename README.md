@@ -35,7 +35,7 @@
 - Python 3.x
 - 必要套件：
 ```
-pip install selenium webdriver-manager tkcalendar
+pip install selenium webdriver-manager tkcalendar holidays
 ```
 
 ---

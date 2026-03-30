@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import holidays
 
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -136,6 +137,10 @@ class DateMultiSelectUI(BaseUI):
         self.month = month
         self.existing_dates = existing_dates # ROC format strings
         self.selected_dates = []
+
+        # Initialize Taiwan holidays
+        self.tw_holidays = holidays.Taiwan(years=self.year)
+        self.skip_holiday_var = tk.BooleanVar(value=True)
         
         # UI Layout: Left (Calendar), Right (Controls)
         main_frame = tk.Frame(self.root)
@@ -162,9 +167,8 @@ class DateMultiSelectUI(BaseUI):
         self.n_days_entry.pack(anchor="w", pady=5)
 
         self.skip_weekend_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(control_frame, text="Skip Weekends", 
-                       variable=self.skip_weekend_var).pack(anchor="w")
-
+        tk.Checkbutton(control_frame, text="Skip Weekends", variable=self.skip_weekend_var).pack(anchor="w")
+        tk.Checkbutton(control_frame, text="Skip Public Holidays", variable=self.skip_holiday_var).pack(anchor="w")
         # Selection Display
         tk.Label(control_frame, text="Current Selected:").pack(anchor="w", pady=(10, 0))
         self.selection_label = tk.Label(control_frame, text="0 days", fg="blue")
@@ -215,6 +219,7 @@ class DateMultiSelectUI(BaseUI):
             return
 
         skip_weekend = self.skip_weekend_var.get()
+        skip_holiday = self.skip_holiday_var.get()
         _, num_days = calendar.monthrange(self.year, self.month)
         
         # This counter tracks both existing logs and new selections
@@ -230,6 +235,10 @@ class DateMultiSelectUI(BaseUI):
             # Check if it's a weekend
             is_weekend = cur_date.weekday() >= 5
             if skip_weekend and is_weekend:
+                continue
+            # 2. Check Public Holiday
+            if skip_holiday and cur_date in self.tw_holidays:
+                print(f"Skipping holiday: {cur_date} ({self.tw_holidays.get(cur_date)})")
                 continue
             
             # If the date already exists in the system:

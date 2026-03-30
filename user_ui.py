@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import tkinter as tk
 from tkinter import messagebox, ttk
 from tkcalendar import Calendar
@@ -133,6 +135,19 @@ class DateMultiSelectUI(BaseUI):
         self.selected_dates = []
         
         tk.Label(self.root, text=f"請勾選要執行的日期 ({year}/{month:02d}):", font=("Arial", 10)).pack(pady=10)
+        self.start_date = tk.StringVar(value=f"{year}-{month:02d}-01")
+
+        frame_top = tk.Frame(self.root)
+        frame_top.pack(pady=5)
+
+        self.use_recent_15 = tk.BooleanVar(value=False)
+        chk = tk.Checkbutton(frame_top, text="使用最近15個工作日", variable=self.use_recent_15)
+        chk.grid(row=0, column=0, columnspan=2, pady=5)
+
+ 
+        tk.Label(frame_top, text="起始日:").grid(row=1, column=0)
+        self.entry_start = tk.Entry(frame_top, textvariable=self.start_date, width=15)
+        self.entry_start.grid(row=1, column=1)
 
         # Create a scrollable listbox for multiple selection
         frame = tk.Frame(self.root)
@@ -159,14 +174,31 @@ class DateMultiSelectUI(BaseUI):
         self.root.mainloop()
 
     def submit(self):
-        # Get all selected indices
-        indices = self.listbox.curselection()
-        # Extract the date part from the string "YYYY-MM-DD (Day)"
-        self.selected_dates = [self.listbox.get(i).split(" ")[0] for i in indices]
-        
-        if not self.selected_dates:
-            messagebox.showwarning("Warning", "Please select at least one date.")
-            return
+        if self.use_recent_15.get():
+            try:
+                start = date.fromisoformat(self.start_date.get())
+            except Exception:
+                messagebox.showwarning("Warning", "日期格式錯誤 (YYYY-MM-DD)")
+                return
+
+            today = date.today()
+            result = []
+            current = today
+
+            while len(result) < 15 and current >= start:
+                if current.weekday() < 5:
+                    result.append(current.strftime("%Y-%m-%d"))
+                current -= timedelta(days=1)
+
+            self.selected_dates = list(reversed(result))
+
+        else:
+            indices = self.listbox.curselection()
+            self.selected_dates = [self.listbox.get(i).split(" ")[0] for i in indices]
+
+            if not self.selected_dates:
+                messagebox.showwarning("Warning", "請至少選擇一天")
+                return
 
         self.success = True
         self.root.destroy()

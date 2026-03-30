@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+from tkcalendar import Calendar
 import json
 import os
+import calendar
 
 class BaseUI:
     def __init__(self, title, geometry):
@@ -92,6 +94,83 @@ class SchoolSelectUI(BaseUI):
         self.success = True
         self.root.destroy()
 
+class DateSelectUI(BaseUI):
+    def __init__(self):
+        # Increased height for calendar widget
+        super().__init__("Select Target Date", "400x450")
+        
+        tk.Label(self.root, text="請選擇目標日期 (程式將提取該月份):", font=("Arial", 10)).pack(pady=10)
+        
+        # Calendar widget
+        self.cal = Calendar(self.root, selectmode='day', cursor="hand2")
+        self.cal.pack(pady=10, padx=10, fill="both", expand=True)
+
+        tk.Button(self.root, text="確認日期", command=self.submit).pack(pady=20)
+        
+        self.selected_year = None
+        self.selected_month = None
+        self.root.mainloop()
+
+    def submit(self):
+        # Extract date object from calendar
+        date_obj = self.cal.selection_get()
+        self.selected_year = date_obj.year
+        self.selected_month = date_obj.month
+        
+        # Save to config
+        self.save_config_data({
+            "custom_year": self.selected_year,
+            "custom_month": self.selected_month,
+            "use_custom_date": True
+        })
+        
+        self.success = True
+        self.root.destroy()
+
+class DateMultiSelectUI(BaseUI):
+    def __init__(self, year, month):
+        super().__init__("Select Dates", "350x450")
+        self.selected_dates = []
+        
+        tk.Label(self.root, text=f"請勾選要執行的日期 ({year}/{month:02d}):", font=("Arial", 10)).pack(pady=10)
+
+        # Create a scrollable listbox for multiple selection
+        frame = tk.Frame(self.root)
+        frame.pack(pady=5, fill="both", expand=True)
+
+        scrollbar = tk.Scrollbar(frame, orient="vertical")
+        self.listbox = tk.Listbox(frame, selectmode="multiple", yscrollcommand=scrollbar.set, font=("Courier New", 10))
+        
+        scrollbar.config(command=self.listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.listbox.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        # Generate weekdays for the given month
+        _, num_days = calendar.monthrange(year, month)
+        for day in range(1, num_days + 1):
+            date_obj = date(year, month, day)
+            # Only add weekdays (0-4 = Mon-Fri)
+            if date_obj.weekday() < 5:
+                # Format: 2026-02-01 (Mon)
+                display_str = date_obj.strftime("%Y-%m-%d (%a)")
+                self.listbox.insert(tk.END, display_str)
+
+        tk.Button(self.root, text="確認選擇", command=self.submit).pack(pady=15)
+        self.root.mainloop()
+
+    def submit(self):
+        # Get all selected indices
+        indices = self.listbox.curselection()
+        # Extract the date part from the string "YYYY-MM-DD (Day)"
+        self.selected_dates = [self.listbox.get(i).split(" ")[0] for i in indices]
+        
+        if not self.selected_dates:
+            messagebox.showwarning("Warning", "Please select at least one date.")
+            return
+
+        self.success = True
+        self.root.destroy()
+
 def run_login_ui():
     app = LoginUI()
     # Return both login success and the "Force Manual" flag
@@ -100,3 +179,11 @@ def run_login_ui():
 def run_school_select_ui(options):
     app = SchoolSelectUI(options)
     return app.success
+
+def run_date_select_ui():
+    app = DateSelectUI()
+    return app.success, app.selected_year, app.selected_month
+
+def run_date_multi_select_ui(year, month):
+    app = DateMultiSelectUI(year, month)
+    return app.success, app.selected_dates

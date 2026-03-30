@@ -6,5 +6,6 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "selenium>=4.27.1",
+    "tkcalendar>=1.6.1",
     "webdriver-manager>=4.0.2",
 ]

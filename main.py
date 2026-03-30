@@ -103,7 +103,7 @@ def main():
         school_value = config["school_value"]
         utils.select_school_by_value(driver, school_value)
         print(f"Selected school value: {school_value}")
-
+        user_ui.run_date_select_ui()
         for day in weekdays:
             content = utils.data_pack(day)
             work_content = content["work"]

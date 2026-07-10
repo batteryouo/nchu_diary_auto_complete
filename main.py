@@ -1,7 +1,7 @@
 import calendar
 from datetime import datetime
 import json
-import os
+import traceback
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -64,19 +64,16 @@ def main():
   driver = utils.get_driver()
   driver.get("https://psf.nchu.edu.tw/punch/index.jsp")
 
-  time.sleep(1)
+  wait = WebDriverWait(driver, 10)
 
   try:
     # ===== 4. Login =====
-    driver.find_element(By.ID, "txtLoginID").send_keys(config['id'])
+    wait.until(EC.presence_of_element_located((By.ID, "txtLoginID"))).send_keys(config['id'])
     driver.find_element(By.ID, "txtLoginPWD").send_keys(config['pw'])
     driver.find_element(By.ID, "button").click()
 
-    time.sleep(1)
+    wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "學習日誌"))).click()
 
-    driver.find_element(By.LINK_TEXT, "學習日誌").click()
-
-    wait = WebDriverWait(driver, 10)
     wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, "displayiframe")))
 
     # ===== 5. School selection =====
@@ -149,7 +146,7 @@ def main():
             driver.find_element(By.ID, "btnSent").click()
             print(f"Submitted: {date_str}")
             last_processed_date = date_str
-            time.sleep(1)
+            wait.until(EC.staleness_of(date_input))
     else:
         print("No new dates selected. Proceeding to report generation.")
 
@@ -182,14 +179,9 @@ def main():
 
     driver.find_element(By.ID, "btnSent").click()
 
-  except ValueError as e:
-    print(str(e))
-    
-    import traceback
+  except Exception as e:
+    print(f"Error: {e}")
     traceback.print_exc()
-
-    driver.quit()
-    return
 
   finally:
     wait_until_browser_closes(driver)

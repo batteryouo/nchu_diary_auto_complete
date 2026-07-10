@@ -10,3 +10,11 @@ dependencies = [
     "tkcalendar>=1.6.1",
     "webdriver-manager>=4.0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

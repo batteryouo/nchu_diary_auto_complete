@@ -97,39 +97,6 @@ class SchoolSelectUI(BaseUI):
         self.success = True
         self.root.destroy()
 
-class DateSelectUI(BaseUI):
-    def __init__(self):
-        # Increased height for calendar widget
-        super().__init__("Select Target Date", "400x450")
-        
-        tk.Label(self.root, text="請選擇目標日期 (程式將提取該月份):", font=("Arial", 10)).pack(pady=10)
-        
-        # Calendar widget
-        self.cal = Calendar(self.root, selectmode='day', cursor="hand2")
-        self.cal.pack(pady=10, padx=10, fill="both", expand=True)
-
-        tk.Button(self.root, text="確認日期", command=self.submit).pack(pady=20)
-        
-        self.selected_year = None
-        self.selected_month = None
-        self.root.mainloop()
-
-    def submit(self):
-        # Extract date object from calendar
-        date_obj = self.cal.selection_get()
-        self.selected_year = date_obj.year
-        self.selected_month = date_obj.month
-        
-        # Save to config
-        self.save_config_data({
-            "custom_year": self.selected_year,
-            "custom_month": self.selected_month,
-            "use_custom_date": True
-        })
-        
-        self.success = True
-        self.root.destroy()
-
 class DateMultiSelectUI(BaseUI):
     def __init__(self, year, month, existing_dates):
         super().__init__("Select Dates", "600x500")
@@ -297,10 +264,6 @@ def run_login_ui():
 def run_school_select_ui(options):
     app = SchoolSelectUI(options)
     return app.success
-
-def run_date_select_ui():
-    app = DateSelectUI()
-    return app.success, app.selected_year, app.selected_month
 
 def run_date_multi_select_ui(year, month, existing_dates):
     app = DateMultiSelectUI(year, month, existing_dates)

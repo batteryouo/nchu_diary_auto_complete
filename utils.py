@@ -1,9 +1,6 @@
-import calendar
-from datetime import date, timedelta
+from datetime import date
 import re
 import os
-import platform
-from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -20,39 +17,6 @@ from selenium.webdriver.support.ui import Select
 
 os.environ['WDM_SSL_VERIFY'] = '0'
 os.environ['WDM_TIMEOUT'] = '5'
-
-def set_file_path():
-    # Detect the operating system
-    current_os = platform.system()
-    
-    # Path.home() returns the user's home directory (~ on Linux, C:\Users\Username on Windows)
-    home = Path.home()
-
-    if current_os == "Windows":
-        # Windows: Set to Desktop
-        file_path = home / "Desktop"
-    else:
-        # Linux/macOS: Set to Home (~)
-        file_path = home
-
-    return file_path
-
-def weekdays(year, month):
-    dayList = []
-
-    _, num_days = calendar.monthrange(year, month)
-    today = date.today()
-    count = 0
-    for day in range(1, num_days + 1):
-        current_date = date(year, month, day)
-        if current_date.weekday() < 5 and current_date < today:
-            dayList.append(current_date)
-            count += 1
-
-        if count > 16:
-            break
-
-    return dayList
 
 def data_pack(input_date: date):
     roc_year = input_date.year - 1911
@@ -71,7 +35,7 @@ def get_driver():
         print("Attempting to start Microsoft Edge...")
         options = EdgeOptions()
         options.add_argument("--start-maximized")
-        service = EdgeService()
+        service = EdgeService(EdgeChromiumDriverManager().install())
         return webdriver.Edge(service=service, options=options)
     except Exception as e:
         print(f"Edge failed: {e}")

@@ -48,13 +48,22 @@ pip install selenium webdriver-manager tkcalendar holidays
 
 ---
 
-### 打包成 exe（開發者）
+### 打包成 exe
 
-本專案使用 [uv](https://docs.astral.sh/uv/) 管理套件，打包指令如下：
+#### 方法一：GitHub Actions 自動建置（推薦，不需要在本機安裝 Python/uv）
+
+專案已設定 `.github/workflows/build.yml`：
+
+- 推上 `v*` 開頭的 tag（例如 `git tag v1.0.0 && git push origin v1.0.0`）：GitHub 會自動建置並把 `NCHU_Diary_AutoFill.exe` 附加到對應的 Release，直接到 Releases 頁面下載即可。
+- 也可以到 GitHub 專案的 Actions 頁籤，手動觸發 `Build exe` workflow（workflow_dispatch），完成後在該次執行的 Artifacts 下載 exe，不會建立 Release。
+
+整個下載依賴、打包的過程都在 GitHub 的雲端機器上執行，本機不需要裝 Python 或 uv。
+
+#### 方法二：本機手動打包（開發者，需要先裝 [uv](https://docs.astral.sh/uv/)）
 
 ```
 uv sync
-uv run pyinstaller --onefile --name "NCHU_Diary_AutoFill" --collect-all tkcalendar --collect-all babel --collect-all holidays main.py
+uv run pyinstaller NCHU_Diary_AutoFill.spec
 ```
 
 打包完成後，執行檔會在 `dist/NCHU_Diary_AutoFill.exe`，可直接分享給其他使用者雙擊執行。

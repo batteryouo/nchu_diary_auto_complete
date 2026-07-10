@@ -54,8 +54,8 @@ pip install selenium webdriver-manager tkcalendar holidays
 
 專案已設定 `.github/workflows/build.yml`：
 
-- 推上 `v*` 開頭的 tag（例如 `git tag v1.0.0 && git push origin v1.0.0`）：GitHub 會自動建置並把 `NCHU_Diary_AutoFill.exe` 附加到對應的 Release，直接到 Releases 頁面下載即可。
-- 也可以到 GitHub 專案的 Actions 頁籤，手動觸發 `Build exe` workflow（workflow_dispatch），完成後在該次執行的 Artifacts 下載 exe，不會建立 Release。
+- 推上 `v*` 開頭的 tag（例如 `git tag v1.0.0 && git push origin v1.0.0`）：GitHub 會分別在 Windows、macOS、Linux 三個平台上自動建置，並把 `NCHU_Diary_AutoFill-windows.exe`、`NCHU_Diary_AutoFill-macos`、`NCHU_Diary_AutoFill-linux` 都附加到對應的 Release，直接到 Releases 頁面依平台下載即可。
+- 也可以到 GitHub 專案的 Actions 頁籤，手動觸發 `Build exe` workflow（workflow_dispatch），完成後在該次執行的 Artifacts 下載對應平台的執行檔，不會建立 Release。
 
 整個下載依賴、打包的過程都在 GitHub 的雲端機器上執行，本機不需要裝 Python 或 uv。
 

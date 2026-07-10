@@ -11,7 +11,20 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_path: dist/NCHU_Diary_AutoFill.exe
+            asset_name: NCHU_Diary_AutoFill-windows.exe
+          - os: macos-latest
+            build_path: dist/NCHU_Diary_AutoFill
+            asset_name: NCHU_Diary_AutoFill-macos
+          - os: ubuntu-latest
+            build_path: dist/NCHU_Diary_AutoFill
+            asset_name: NCHU_Diary_AutoFill-linux
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,17 +34,21 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Build exe
+      - name: Build executable
         run: uv run pyinstaller NCHU_Diary_AutoFill.spec
+
+      - name: Rename build output
+        shell: bash
+        run: cp "${{ matrix.build_path }}" "${{ matrix.asset_name }}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NCHU_Diary_AutoFill
-          path: dist/NCHU_Diary_AutoFill.exe
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/NCHU_Diary_AutoFill.exe
+          files: ${{ matrix.asset_name }}

@@ -48,17 +48,10 @@ def main():
     print(f"Error: {CONFIG_FILE} not found.")
     return
 
-  use_custom_date = config.get("use_custom_date", False)
-
-  if use_custom_date:
-    year = config["custom_year"]
-    month = config["custom_month"]
-    print(f"Using custom date: {year}/{month:02d}")
-  else:
-    now = datetime.now()
-    year = now.year
-    month = now.month
-    print(f"Using current date: {year}/{month:02d}")
+  now = datetime.now()
+  year = now.year
+  month = now.month
+  print(f"Using current date: {year}/{month:02d}")
 
   # ===== 3. Start browser =====
   driver = utils.get_driver()

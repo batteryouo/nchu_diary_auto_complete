@@ -246,13 +246,6 @@ class DateMultiSelectUI(BaseUI):
             if not messagebox.askyesno("Warning", "No dates selected. Proceed anyway?"):
                 return
 
-        # Update the config to match the calendar's current view
-        self.save_config_data({
-            "custom_year": self.year,
-            "custom_month": self.month,
-            "use_custom_date": True  # Force use of the UI-selected month
-        })
-        
         self.success = True
         self.root.destroy()
 

@@ -22,9 +22,16 @@
 
 ### 快速開始（一般使用者，不需要裝 Python）
 
-1. 取得 `NCHU_Diary_AutoFill.exe`（跟有打包過的人索取，或自行依照下方「打包成 exe」步驟產生），放到你想要的資料夾（`config.json` 會自動產生在同一個資料夾）。
-2. 雙擊執行，依照下方「使用說明」操作即可。
-3. 如果 Windows Defender 或防毒軟體跳出警告（PyInstaller 打包的 exe 沒有簽章，常被誤判），選擇「仍要執行」。
+1. 到 [Releases](https://github.com/batteryouo/nchu_diary_auto_complete/releases/latest) 頁面，依你的作業系統下載對應檔案（Windows 選 `-windows.exe`，macOS 選 `-macos`，Linux 選 `-linux`）。
+
+   ![下載對應平台的執行檔](images/release-assets.png)
+
+2. 放到你想要的資料夾，雙擊執行（`config.json` 會自動產生在同一個資料夾）。
+
+   ![下載完成後雙擊執行](images/downloaded-exe.png)
+
+3. 如果 Windows Defender 或防毒軟體跳出警告（PyInstaller 打包的執行檔沒有簽章，常被誤判），選擇「仍要執行」。
+4. 依照下方「使用說明」完成登入與日期選取即可。
 
 ---
 
@@ -72,19 +79,16 @@ uv run pyinstaller NCHU_Diary_AutoFill.spec
 
 ### 使用說明
 
-1. 執行 python main.py。
+1. **登入**：輸入身分證字號與出生年月日（格式如 900928）。第一次使用、或想換一個計畫單位時，勾選「不使用預設設定檔」。
 
-2. 在彈出的登入視窗輸入學號與密碼。
-     - 若想更改已儲存的計畫單位，可勾選「不使用預設設定檔」。
+   ![登入視窗](images/login-ui.png)
 
-3. 進入日期選取頁面：
-  
-    - 設定想要填寫的天數（預設 15 天）。
-  
-    - 確認是否跳過六日。
-  
-    - 點擊 "Apply Auto Logic" 進行預選，或直接在日曆上手動點選日期。
+2. **選擇計畫單位**（僅在有多個可選、且未使用設定檔時出現）：從下拉選單選你的校內編號。
 
-4. 點擊 "Confirm & Submit"，程式將自動開啟瀏覽器執行填寫動作。
+   ![選擇校內編號](images/select-school-ui.png)
 
-5. 手動確認與關閉：程式填寫並跳轉至列印報表後會暫停，請確認資料無誤後，手動關閉瀏覽器視窗，程式才會正式結束。
+3. **選擇要填寫的日期**：畫面上的說明文字已經對應每個按鈕的功能，預設會自動勾選本月 15 天（跳過六日與國定假日），也可以直接在日曆上手動點選增減，設定好後按 **Confirm & Submit**。
+
+   ![日期選取頁面](images/select-dates-ui.png)
+
+4. 程式會自動開啟瀏覽器並依序填入所選日期，完成後跳轉到列印報表頁面並暫停，確認資料無誤後手動關閉瀏覽器，程式才會結束。

@@ -20,6 +20,14 @@
 
 ---
 
+### 快速開始（一般使用者，不需要裝 Python）
+
+1. 取得 `NCHU_Diary_AutoFill.exe`（跟有打包過的人索取，或自行依照下方「打包成 exe」步驟產生），放到你想要的資料夾（`config.json` 會自動產生在同一個資料夾）。
+2. 雙擊執行，依照下方「使用說明」操作即可。
+3. 如果 Windows Defender 或防毒軟體跳出警告（PyInstaller 打包的 exe 沒有簽章，常被誤判），選擇「仍要執行」。
+
+---
+
 ### 檔案結構
 
 - main.py: 程式進入點，負責整體的執行流程邏輯。
@@ -37,6 +45,19 @@
 ```
 pip install selenium webdriver-manager tkcalendar holidays
 ```
+
+---
+
+### 打包成 exe（開發者）
+
+本專案使用 [uv](https://docs.astral.sh/uv/) 管理套件，打包指令如下：
+
+```
+uv sync
+uv run pyinstaller --onefile --name "NCHU_Diary_AutoFill" --collect-all tkcalendar --collect-all babel --collect-all holidays main.py
+```
+
+打包完成後，執行檔會在 `dist/NCHU_Diary_AutoFill.exe`，可直接分享給其他使用者雙擊執行。
 
 ---
 

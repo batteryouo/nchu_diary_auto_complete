@@ -84,6 +84,9 @@ impl BrowserSession {
                 } else {
                     "--start-maximized"
                 })?;
+                if headless {
+                    caps.add_arg("--window-size=1280,1200")?;
+                }
                 caps.into()
             }
             "chrome" => {
@@ -93,6 +96,9 @@ impl BrowserSession {
                 } else {
                     "--start-maximized"
                 })?;
+                if headless {
+                    caps.add_arg("--window-size=1280,1200")?;
+                }
                 caps.into()
             }
             "firefox" => {
@@ -127,9 +133,27 @@ impl BrowserSession {
         Ok(element)
     }
 
+    async fn click(&self, by: By) -> Result<()> {
+        let element = self.find(by).await?;
+        element.scroll_into_view().await?;
+        match element.click().await {
+            Ok(()) => Ok(()),
+            Err(click_error) => {
+                // Some pages keep a fixed footer over controls at small headless
+                // viewport sizes. The DOM click still triggers the page handler
+                // after the normal WebDriver click has confirmed the element.
+                self.driver
+                    .execute("arguments[0].click();", vec![element.to_json()?])
+                    .await
+                    .with_context(|| format!("瀏覽器點擊失敗：{click_error:#}"))?;
+                Ok(())
+            }
+        }
+    }
+
     async fn open_section(&self, text: &str) -> Result<()> {
         self.driver.enter_default_frame().await?;
-        self.find(By::LinkText(text)).await?.click().await?;
+        self.click(By::LinkText(text)).await?;
         self.find(By::Id("displayiframe"))
             .await?
             .enter_frame()
@@ -142,7 +166,7 @@ impl BrowserSession {
         self.driver.goto(url).await.context("無法開啟登入頁面")?;
         self.replace("txtLoginID", &config.id).await?;
         self.replace("txtLoginPWD", &config.pw).await?;
-        self.find(By::Id("button")).await?.click().await?;
+        self.click(By::Id("button")).await?;
         self.open_section("學習日誌")
             .await
             .context("登入失敗或找不到學習日誌，請檢查登入資料")?;
@@ -246,7 +270,7 @@ impl BrowserSession {
                 == Some(school),
             "校內編號在送出前被重設，已停止以避免寫入錯誤計畫"
         );
-        self.find(By::Id("btnSent")).await?.click().await?;
+        self.click(By::Id("btnSent")).await?;
         // Never retry POSTs: a timeout can occur after the server has already saved the row.
         input
             .wait_until()
@@ -283,7 +307,7 @@ impl BrowserSession {
             "校內編號在報表送出前被重設，已停止以避免查詢錯誤計畫"
         );
         let existing_windows = self.driver.windows().await?;
-        self.find(By::Id("btnSent")).await?.click().await?;
+        self.click(By::Id("btnSent")).await?;
         self.switch_to_report_window(&existing_windows).await?;
         self.wait_for_print_report().await?;
         Ok(())

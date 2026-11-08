@@ -86,6 +86,10 @@ impl BrowserSession {
                 })?;
                 if headless {
                     caps.add_arg("--window-size=1280,1200")?;
+                    caps.add_arg("--disable-gpu")?;
+                    caps.add_arg("--disable-dev-shm-usage")?;
+                    caps.add_arg("--no-first-run")?;
+                    caps.add_arg("--no-default-browser-check")?;
                 }
                 caps.into()
             }
@@ -98,6 +102,10 @@ impl BrowserSession {
                 })?;
                 if headless {
                     caps.add_arg("--window-size=1280,1200")?;
+                    caps.add_arg("--disable-gpu")?;
+                    caps.add_arg("--disable-dev-shm-usage")?;
+                    caps.add_arg("--no-first-run")?;
+                    caps.add_arg("--no-default-browser-check")?;
                 }
                 caps.into()
             }

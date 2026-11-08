@@ -43,6 +43,7 @@ pub struct DiaryApp {
     selected: BTreeSet<NaiveDate>,
     submitted: usize,
     skipped: usize,
+    report_pdf: Option<PathBuf>,
     closing: bool,
     restarting: bool,
     stopped: bool,
@@ -91,6 +92,7 @@ impl DiaryApp {
             selected: BTreeSet::new(),
             submitted: 0,
             skipped: 0,
+            report_pdf: None,
             closing: false,
             restarting: false,
             stopped: false,
@@ -174,10 +176,15 @@ impl DiaryApp {
                     }
                     self.page = Page::Dates;
                 }
-                Event::ReportReady { submitted, skipped } => {
+                Event::ReportReady {
+                    submitted,
+                    skipped,
+                    pdf_path,
+                } => {
                     self.compact_mode = !self.demo;
                     self.submitted = submitted;
                     self.skipped = skipped;
+                    self.report_pdf = pdf_path;
                     self.page = Page::Report;
                 }
                 Event::Failed(error) => {
@@ -287,6 +294,9 @@ impl DiaryApp {
                     Color32::from_rgb(164, 99, 0),
                     "請在瀏覽器確認資料與列印報表；此狀態窗會保持在最上層。",
                 );
+                if let Some(path) = &self.report_pdf {
+                    ui.label(format!("PDF 已儲存：{}", path.display()));
+                }
                 if ui.button("關閉瀏覽器並結束本次工作").clicked() {
                     self.send(Command::CloseBrowser, "正在關閉瀏覽器…");
                     // Preserve Report state so BrowserClosed can finish the application.
@@ -638,8 +648,11 @@ impl DiaryApp {
                 ui.label(if self.demo {
                     "這是示範結果，未連線或新增真實日誌。"
                 } else {
-                    "請在瀏覽器確認資料與列印報表；手動關閉瀏覽器後程式會結束。"
+                    "PDF 已自動儲存；請在瀏覽器確認資料與列印報表，手動關閉瀏覽器後程式會結束。"
                 });
+                if let Some(path) = &self.report_pdf {
+                    ui.small(format!("PDF 路徑：{}", path.display()));
+                }
                 if ui
                     .button(if self.demo {
                         "返回登入"

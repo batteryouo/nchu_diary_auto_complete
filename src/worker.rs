@@ -1,4 +1,10 @@
-use std::{collections::BTreeSet, path::PathBuf, sync::mpsc, thread, time::Duration};
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    sync::mpsc,
+    thread,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, ensure};
 use chrono::{Datelike, Local, NaiveDate};
@@ -33,6 +39,7 @@ pub enum Event {
     ReportReady {
         submitted: usize,
         skipped: usize,
+        pdf_path: Option<PathBuf>,
     },
     Failed(String),
     BrowserClosed,
@@ -111,6 +118,24 @@ struct State {
     failed: bool,
     demo: bool,
     config_path: PathBuf,
+}
+
+fn report_pdf_path(config_path: &Path, school: &str, month: Month) -> PathBuf {
+    let parent = config_path.parent().unwrap_or_else(|| Path::new("."));
+    let safe_school: String = school
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    parent.join("reports").join(format!(
+        "learning-log_{safe_school}_{}-{:02}.pdf",
+        month.year, month.month
+    ))
 }
 
 async fn run(
@@ -289,10 +314,29 @@ impl State {
                         .open_report(school, month, Local::now().date_naive())
                         .await?;
                 }
+                let pdf_path = if self.demo {
+                    None
+                } else {
+                    let path = report_pdf_path(&self.config_path, school, month);
+                    if let Some(parent) = path.parent() {
+                        tokio::fs::create_dir_all(parent).await?;
+                    }
+                    emit(Event::Progress(format!(
+                        "正在下載 PDF：{}…",
+                        path.display()
+                    )));
+                    self.session
+                        .as_ref()
+                        .context("尚未登入")?
+                        .save_current_pdf(&path)
+                        .await?;
+                    Some(path)
+                };
                 self.report_open = true;
                 emit(Event::ReportReady {
                     submitted: dates_to_submit.len(),
                     skipped,
+                    pdf_path,
                 });
             }
             Command::CloseBrowser => {

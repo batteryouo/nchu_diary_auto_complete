@@ -1,8 +1,8 @@
-use std::{collections::BTreeSet, time::Duration};
+use std::{collections::BTreeSet, path::Path, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
 use chrono::{Local, NaiveDate};
-use thirtyfour::{components::SelectElement, prelude::*};
+use thirtyfour::{common::print::PrintParameters, components::SelectElement, prelude::*};
 use tokio::time::{Instant, sleep};
 
 use crate::{
@@ -272,7 +272,71 @@ impl BrowserSession {
                 == Some(school),
             "校內編號在報表送出前被重設，已停止以避免查詢錯誤計畫"
         );
+        let existing_windows = self.driver.windows().await?;
         self.find(By::Id("btnSent")).await?.click().await?;
+        self.switch_to_report_window(&existing_windows).await?;
+        self.wait_for_print_report().await?;
+        Ok(())
+    }
+
+    async fn switch_to_report_window(&self, existing_windows: &[WindowHandle]) -> Result<()> {
+        let deadline = Instant::now() + WAIT;
+        loop {
+            let windows = self.driver.windows().await?;
+            if let Some(handle) = windows
+                .iter()
+                .find(|handle| !existing_windows.contains(handle))
+            {
+                self.driver.switch_to_window(handle.clone()).await?;
+                self.driver.enter_default_frame().await?;
+                return Ok(());
+            }
+            // Some browser versions navigate the current tab instead of opening a new one.
+            let current_page_is_report = self
+                .driver
+                .execute(
+                    "return document.body && (document.body.innerText.includes('國立中興大學計畫人員學習日誌') || document.querySelector('#printed') !== null);",
+                    Vec::new(),
+                )
+                .await?
+                .convert::<bool>()?;
+            if current_page_is_report {
+                self.driver.enter_default_frame().await?;
+                return Ok(());
+            }
+            ensure!(Instant::now() < deadline, "等待學習日誌列印分頁開啟逾時");
+            sleep(POLL).await;
+        }
+    }
+
+    async fn wait_for_print_report(&self) -> Result<()> {
+        let deadline = Instant::now() + WAIT;
+        loop {
+            let ready = self
+                .driver
+                .execute(
+                    "return document.readyState === 'complete' && document.body && (document.body.innerText.includes('國立中興大學計畫人員學習日誌') || document.querySelector('#printed') !== null);",
+                    Vec::new(),
+                )
+                .await?
+                .convert::<bool>()?;
+            if ready {
+                return Ok(());
+            }
+            ensure!(Instant::now() < deadline, "等待學習日誌列印報表載入逾時");
+            sleep(POLL).await;
+        }
+    }
+
+    pub async fn save_current_pdf(&self, path: &Path) -> Result<()> {
+        let pdf = self
+            .driver
+            .print_page(PrintParameters::default())
+            .await
+            .context("無法將報表轉成 PDF")?;
+        tokio::fs::write(path, pdf)
+            .await
+            .with_context(|| format!("無法儲存 PDF：{}", path.display()))?;
         Ok(())
     }
 

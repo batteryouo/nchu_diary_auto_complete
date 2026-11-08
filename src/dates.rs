@@ -8,7 +8,7 @@ pub const WORK_CONTENT: &str = "協助教授計畫";
 pub const MIN_YEAR: i32 = 1912;
 pub const MAX_YEAR: i32 = 2099;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Month {
     pub year: i32,
     pub month: u32,
@@ -116,16 +116,18 @@ impl Default for SelectionRules {
     }
 }
 
-/// Like the Python version, eligible existing logs count toward N and are never resubmitted.
-/// Selection covers the entire month, including future dates, to preserve existing behavior.
+/// Eligible existing logs count toward N and are never resubmitted.
+/// Dates after `today` are always excluded, regardless of the selected rules.
 pub fn auto_select(
     month: Month,
     rules: &SelectionRules,
     existing: &BTreeSet<NaiveDate>,
     holidays: &TaiwanHolidays,
+    today: NaiveDate,
 ) -> BTreeSet<NaiveDate> {
     month
         .days()
+        .filter(|date| *date <= today)
         .filter(|date| !rules.skip_weekends || date.weekday().number_from_monday() <= 5)
         .filter(|date| !rules.skip_holidays || !holidays.contains(*date))
         .take(rules.target_days)
@@ -137,10 +139,15 @@ pub fn submission_dates(
     month: Month,
     dates: &BTreeSet<NaiveDate>,
     existing: &BTreeSet<NaiveDate>,
+    today: NaiveDate,
 ) -> Result<Vec<NaiveDate>> {
     ensure!(
         dates.iter().all(|date| month.contains(*date)),
         "選取日期必須在報表月份內"
+    );
+    ensure!(
+        dates.iter().all(|date| *date <= today),
+        "不可填寫今天之後的日期"
     );
     Ok(dates.difference(existing).copied().collect())
 }
@@ -182,7 +189,13 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            auto_select(Month::new(2026, 1)?, &rules, &existing, &holidays),
+            auto_select(
+                Month::new(2026, 1)?,
+                &rules,
+                &existing,
+                &holidays,
+                d("2026-01-31")
+            ),
             BTreeSet::from([d("2026-01-05"), d("2026-01-06")])
         );
         Ok(())
@@ -198,7 +211,7 @@ mod tests {
             skip_holidays: false,
         };
         assert_eq!(
-            auto_select(month, &rules, &BTreeSet::new(), &holidays),
+            auto_select(month, &rules, &BTreeSet::new(), &holidays, d("2026-01-31")),
             BTreeSet::from([d("2026-01-01"), d("2026-01-02"), d("2026-01-03")])
         );
         assert!(
@@ -209,7 +222,8 @@ mod tests {
                     ..rules
                 },
                 &BTreeSet::new(),
-                &holidays
+                &holidays,
+                d("2026-01-31")
             )
             .is_empty()
         );
@@ -246,12 +260,52 @@ mod tests {
         let month = Month::new(2026, 11)?;
         let selected = BTreeSet::from([d("2026-11-03"), d("2026-11-02")]);
         assert_eq!(
-            submission_dates(month, &selected, &BTreeSet::from([d("2026-11-02")]))?,
+            submission_dates(
+                month,
+                &selected,
+                &BTreeSet::from([d("2026-11-02")]),
+                d("2026-11-08")
+            )?,
             vec![d("2026-11-03")]
         );
         assert!(
-            submission_dates(month, &BTreeSet::from([d("2026-12-01")]), &BTreeSet::new()).is_err()
+            submission_dates(
+                month,
+                &BTreeSet::from([d("2026-12-01")]),
+                &BTreeSet::new(),
+                d("2026-11-08")
+            )
+            .is_err()
         );
+        assert!(
+            submission_dates(
+                month,
+                &BTreeSet::from([d("2026-11-09")]),
+                &BTreeSet::new(),
+                d("2026-11-08")
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn future_dates_are_never_auto_selected() -> Result<()> {
+        let holidays = TaiwanHolidays::bundled()?;
+        let rules = SelectionRules {
+            target_days: 31,
+            skip_weekends: false,
+            skip_holidays: false,
+        };
+        let selected = auto_select(
+            Month::new(2026, 11)?,
+            &rules,
+            &BTreeSet::new(),
+            &holidays,
+            d("2026-11-08"),
+        );
+        assert_eq!(selected.len(), 8);
+        assert_eq!(selected.last(), Some(&d("2026-11-08")));
         Ok(())
     }
 }

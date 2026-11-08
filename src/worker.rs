@@ -262,7 +262,8 @@ impl State {
                         .prepare_school(school)
                         .await?;
                 }
-                let dates_to_submit = submission_dates(month, &dates, &self.existing)?;
+                let today = Local::now().date_naive();
+                let dates_to_submit = submission_dates(month, &dates, &self.existing, today)?;
                 let skipped = dates.len() - dates_to_submit.len();
                 for (index, date) in dates_to_submit.iter().enumerate() {
                     emit(Event::Progress(format!(
@@ -275,7 +276,7 @@ impl State {
                         self.session
                             .as_ref()
                             .context("尚未登入")?
-                            .submit_date(*date)
+                            .submit_date(school, *date)
                             .await?;
                     }
                     self.existing.insert(*date);

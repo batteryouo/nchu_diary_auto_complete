@@ -103,9 +103,9 @@ async fn login_switch_school_submit_and_print_without_touching_nchu() -> Result<
         let d = |value: &str| value.parse::<NaiveDate>().unwrap();
         assert_eq!(existing, BTreeSet::from([d("2026-11-03")]));
         let selected = BTreeSet::from([d("2026-11-03"), d("2026-11-02"), d("2026-11-04")]);
-        let dates = submission_dates(Month::new(2026, 11)?, &selected, &existing)?;
+        let dates = submission_dates(Month::new(2026, 11)?, &selected, &existing, d("2026-11-08"))?;
         for date in dates {
-            session.submit_date(date).await?;
+            session.submit_date("B", date).await?;
         }
         let records: Vec<serde_json::Value> = session
             .driver

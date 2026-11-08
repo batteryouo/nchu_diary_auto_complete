@@ -59,9 +59,19 @@ pub fn default_path() -> Result<PathBuf> {
 mod tests {
     use super::*;
 
+    fn test_dir() -> Result<tempfile::TempDir> {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("test-tmp");
+        fs::create_dir_all(&base)?;
+        Ok(tempfile::Builder::new()
+            .prefix("config-")
+            .tempdir_in(base)?)
+    }
+
     #[test]
     fn reads_python_config_and_preserves_unknown_settings() -> Result<()> {
-        let dir = tempfile::tempdir()?;
+        let dir = test_dir()?;
         let path = dir.path().join("config.json");
         fs::write(
             &path,
@@ -82,7 +92,7 @@ mod tests {
 
     #[test]
     fn missing_file_is_first_run_but_malformed_file_is_an_error() -> Result<()> {
-        let dir = tempfile::tempdir()?;
+        let dir = test_dir()?;
         let path = dir.path().join("config.json");
         assert!(Config::load(&path)?.id.is_empty());
         fs::write(&path, "{")?;

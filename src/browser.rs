@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate};
 use thirtyfour::{components::SelectElement, prelude::*};
 use tokio::time::{Instant, sleep};
 
@@ -216,10 +216,26 @@ impl BrowserSession {
         self.existing_dates().await
     }
 
-    pub async fn submit_date(&self, date: NaiveDate) -> Result<()> {
+    pub async fn submit_date(&self, school: &str, date: NaiveDate) -> Result<()> {
+        ensure!(
+            date <= Local::now().date_naive(),
+            "不可填寫今天之後的日期：{date}"
+        );
+        // The site's POST resets the school dropdown to its first option. Re-select it
+        // before every submission so a later date cannot be saved under another plan.
+        self.select_school(school).await?;
         let roc = roc_date(date);
         let input = self.replace("date", &roc).await?;
         self.replace("work", WORK_CONTENT).await?;
+        ensure!(
+            self.find(By::Name("schno"))
+                .await?
+                .value()
+                .await?
+                .as_deref()
+                == Some(school),
+            "校內編號在送出前被重設，已停止以避免寫入錯誤計畫"
+        );
         self.find(By::Id("btnSent")).await?.click().await?;
         // Never retry POSTs: a timeout can occur after the server has already saved the row.
         input
@@ -247,6 +263,15 @@ impl BrowserSession {
         let (start, end) = month.report_range(today);
         self.replace("dtQryBeg", &roc_date(start)).await?;
         self.replace("dtQryEnd", &roc_date(end)).await?;
+        ensure!(
+            self.find(By::Name("schno"))
+                .await?
+                .value()
+                .await?
+                .as_deref()
+                == Some(school),
+            "校內編號在報表送出前被重設，已停止以避免查詢錯誤計畫"
+        );
         self.find(By::Id("btnSent")).await?.click().await?;
         Ok(())
     }

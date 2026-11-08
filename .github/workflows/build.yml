@@ -1,13 +1,14 @@
-name: Build exe
+name: Rust checks and builds
 
 on:
   push:
-    tags:
-      - "v*"
-  workflow_dispatch: {}
+    branches: [main, "codex/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -16,39 +17,77 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            build_path: dist/NCHU_Diary_AutoFill.exe
+            build_path: target/release/nchu-diary-autofill.exe
             asset_name: NCHU_Diary_AutoFill-windows.exe
           - os: macos-latest
-            build_path: dist/NCHU_Diary_AutoFill
+            build_path: target/release/nchu-diary-autofill
             asset_name: NCHU_Diary_AutoFill-macos
           - os: ubuntu-latest
-            build_path: dist/NCHU_Diary_AutoFill
+            build_path: target/release/nchu-diary-autofill
             asset_name: NCHU_Diary_AutoFill-linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+      - name: Linux GUI and TLS dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxcb-shape0-dev libxcb-xfixes0-dev libgl1-mesa-dev fonts-noto-cjk
 
-      - name: Install dependencies
-        run: uv sync
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --locked
+
+      - name: Local browser integration
+        if: runner.os == 'Linux'
+        env:
+          NCHU_TEST_BROWSER: Chrome
+        run: cargo test --locked --test browser_flow -- --ignored
 
       - name: Build executable
-        run: uv run pyinstaller NCHU_Diary_AutoFill.spec
+        run: cargo build --release --locked
 
       - name: Rename build output
         shell: bash
         run: cp "${{ matrix.build_path }}" "${{ matrix.asset_name }}"
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}
+          path: |
+            ${{ matrix.asset_name }}
+            LICENSE
+            THIRD_PARTY_NOTICES.md
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          files: ${{ matrix.asset_name }}
+          pattern: NCHU_Diary_AutoFill-*
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/NCHU_Diary_AutoFill-*
+            LICENSE
+            THIRD_PARTY_NOTICES.md

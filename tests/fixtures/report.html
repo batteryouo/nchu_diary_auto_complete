@@ -1,0 +1,13 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Local report</title>
+<select name="schno" onchange="location.href='/report?school='+this.value">
+<option value="A">計畫 A</option><option value="B">計畫 B</option></select>
+<form id="report"><input id="dtQryBeg"><input id="dtQryEnd"><button id="btnSent">查詢</button></form>
+<script>
+document.querySelector('[name=schno]').value=new URLSearchParams(location.search).get('school') || 'A';
+document.getElementById('report').onsubmit = event => {
+    event.preventDefault();
+    sessionStorage.setItem('report', JSON.stringify({school:document.querySelector('[name=schno]').value,
+        start:document.getElementById('dtQryBeg').value,end:document.getElementById('dtQryEnd').value}));
+    location.href='/printed';
+};
+</script></html>

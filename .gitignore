@@ -4,3 +4,7 @@ config.json
 .pytest_cache/
 build/
 dist/
+target/
+.cargo-cache/
+.driver-cache/
+config.json.tmp

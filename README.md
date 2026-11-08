@@ -1,94 +1,129 @@
-# NCHU Learning Log Automator
+# NCHU Learning Log Automator — Rust
 
-這是一個專為中興大學學生設計的自動化工具，用於快速填寫學習日誌並產出報表。
+中興大學學習日誌自動填寫工具。使用 Rust、egui/eframe 與 thirtyfour 製作桌面介面及瀏覽器自動化，執行時不需要 Python。
 
----
+## 功能
 
-### 核心功能
-- 圖形化登入介面：提供 GUI 輸入學號與密碼，並支援記住資訊。
+- 圖形化登入，記住身分證字號、出生年月日及計畫單位。
+- 相容原 Python 版的 `config.json`（`id`、`pw`、`school_value`），保留未知設定欄位。
+- 多個計畫時可選擇校內編號；單一計畫自動選取，已失效的設定會要求重選。
+- 可跨月、跨年切換的日期多選日曆，預設自動選取 15 天，可排除週末與臺灣國定假日。
+- 已有且符合篩選條件的日誌計入 N 天，只送出尚未填寫的日期。
+- 依序嘗試 Edge、Chrome、Firefox，自動下載符合瀏覽器版本的 WebDriver。
+- 工作內容沿用「協助教授計畫」。送出前重新讀取紀錄，每筆送出後確認表格更新；失敗時停止，不自動重試送出。
+- 完成後開啟「學習日誌列印」：當月查詢 1 日到今天，其他月份查詢整月。
+- 沒有選取新增日期時可直接查詢報表。報表開啟後保留瀏覽器供人工確認，關閉瀏覽器後程式結束。
+- 瀏覽器操作在背景執行；介面可顯示進度、取消工作，離開時會關閉本次啟動的瀏覽器與驅動程式。
 
-- 智慧日期選取：
-  - 多選日曆：可自由點選本月要填寫的日期。
-  - 自動選取 N 天：預設自動選取 15 天，省去逐一核對的時間。
-  - 過濾機制：自動跳過週末（可選）以及網頁上已經存在紀錄的日期。
+自動選取沿用原版規則，涵蓋整個月，可能包含未來日期；送出前請確認日曆。週末及假日篩選只影響自動選取，手動仍可點選。
 
-- 自動化填寫：自動登入、切換框架 (Frame)、選取計畫單位並填入工作內容。
+## 開發與執行
 
-- 報表自動產出：填寫完成後自動跳轉至列印頁面，並根據「自定義月份」或「當前日期」自動設定報表區間。
+需要 **Rust 1.99 以上**，以及 Edge、Chrome、Firefox 至少一種瀏覽器。首次建置需要網路下載 Cargo 套件，首次啟動瀏覽器需要下載 WebDriver。
 
-- 多瀏覽器支援：系統會依序嘗試啟動 Edge、Chrome 或 Firefox。
-
----
-
-### 快速開始（一般使用者，不需要裝 Python）
-
-1. 到 [Releases](https://github.com/batteryouo/nchu_diary_auto_complete/releases/latest) 頁面，依你的作業系統下載對應檔案（Windows 選 `-windows.exe`，macOS 選 `-macos`，Linux 選 `-linux`）。
-
-   ![下載對應平台的執行檔](images/release-assets.png)
-
-2. 放到你想要的資料夾，雙擊執行（`config.json` 會自動產生在同一個資料夾）。
-
-   ![下載完成後雙擊執行](images/downloaded-exe.png)
-
-3. 如果 Windows Defender 或防毒軟體跳出警告（PyInstaller 打包的執行檔沒有簽章，常被誤判），選擇「仍要執行」。
-4. 依照下方「使用說明」完成登入與日期選取即可。
-
----
-
-### 檔案結構
-
-- main.py: 程式進入點，負責整體的執行流程邏輯。
-
-- user_ui.py: 包含所有的 GUI 視窗類別（登入、校號選擇、日期多選）。
-
-- utils.py: 存放瀏覽器驅動設定、日期轉換（民國年/西元年）及網頁元素爬取等工具函式。
-
-- config.json: 儲存使用者設定、學號與計畫編號（自動生成）。
-
-### 使用環境
-
-- Python 3.x
-- 必要套件：
-```
-pip install selenium webdriver-manager tkcalendar holidays
+```sh
+cargo run --locked
 ```
 
----
+Windows 可使用現有 `stable-x86_64-pc-windows-gnu` 工具鏈，需讓 MinGW-w64 的 `gcc` 可在 PATH 找到；也可使用 MSVC 工具鏈搭配 Visual Studio C++ Build Tools。專案將 Cargo 並行工作數設為 2，避免 GUI 依賴編譯時耗盡記憶體。
 
-### 打包成 exe
+Ubuntu / Debian 建置前安裝桌面與系統 TLS 開發套件；顯示中文需有 CJK 字型：
 
-#### 方法一：GitHub Actions 自動建置（推薦，不需要在本機安裝 Python/uv）
-
-專案已設定 `.github/workflows/build.yml`：
-
-- 推上 `v*` 開頭的 tag（例如 `git tag v1.0.0 && git push origin v1.0.0`）：GitHub 會分別在 Windows、macOS、Linux 三個平台上自動建置，並把 `NCHU_Diary_AutoFill-windows.exe`、`NCHU_Diary_AutoFill-macos`、`NCHU_Diary_AutoFill-linux` 都附加到對應的 Release，直接到 Releases 頁面依平台下載即可。
-- 也可以到 GitHub 專案的 Actions 頁籤，手動觸發 `Build exe` workflow（workflow_dispatch），完成後在該次執行的 Artifacts 下載對應平台的執行檔，不會建立 Release。
-
-整個下載依賴、打包的過程都在 GitHub 的雲端機器上執行，本機不需要裝 Python 或 uv。
-
-#### 方法二：本機手動打包（開發者，需要先裝 [uv](https://docs.astral.sh/uv/)）
-
-```
-uv sync
-uv run pyinstaller NCHU_Diary_AutoFill.spec
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config libssl-dev libfontconfig1-dev libxkbcommon-dev libwayland-dev libx11-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev libxcb-shape0-dev libxcb-xfixes0-dev libgl1-mesa-dev fonts-noto-cjk
 ```
 
-打包完成後，執行檔會在 `dist/NCHU_Diary_AutoFill.exe`，可直接分享給其他使用者雙擊執行。
+egui 會使用系統字型補上中文字元。macOS 使用系統中文字型與原生 TLS，開發時需有 Xcode Command Line Tools。
 
----
+### 設定檔
 
-### 使用說明
+在專案根目錄使用 `cargo run` 時，讀寫根目錄的 `config.json`；散佈執行檔則預設使用執行檔旁的檔案。可以明確指定路徑：
 
-1. **登入**：輸入身分證字號與出生年月日（格式如 900928）。第一次使用、或想換一個計畫單位時，勾選「不使用預設設定檔」。
+```sh
+cargo run --locked -- --config "path/to/config.json"
+```
 
-   ![登入視窗](images/login-ui.png)
+將舊版 `config.json` 放在上述位置即可沿用。登入資料以明文儲存在本機，設定檔已列入 `.gitignore`。格式錯誤時介面會顯示錯誤，修復後可重新讀取。
 
-2. **選擇計畫單位**（僅在有多個可選、且未使用設定檔時出現）：從下拉選單選你的校內編號。
+### 離線示範
 
-   ![選擇校內編號](images/select-school-ui.png)
+```sh
+cargo run --locked -- --demo
+```
 
-3. **選擇要填寫的日期**：畫面上的說明文字已經對應每個按鈕的功能，預設會自動勾選本月 15 天（跳過六日與國定假日），也可以直接在日曆上手動點選增減，設定好後按 **Confirm & Submit**。
+示範模式預填虛擬帳密及兩個計畫，可以操作登入、計畫選擇、日曆及完成畫面；不連線學校網站、不寫設定檔，也不會新增真實日誌。
 
-   ![日期選取頁面](images/select-dates-ui.png)
+### 使用流程
 
-4. 程式會自動開啟瀏覽器並依序填入所選日期，完成後跳轉到列印報表頁面並暫停，確認資料無誤後手動關閉瀏覽器，程式才會結束。
+1. 輸入身分證字號及出生年月日（例如 `900928`），需要換計畫時勾選「重新選擇計畫單位」。
+2. 登入後如有多個計畫，選擇要填寫的校內編號。
+3. 選擇月份，調整 N 天與篩選條件，按「套用自動選取規則」，或直接點選日曆增減日期。綠色日期表示此計畫已有紀錄。
+4. 確認選取日期及報表區間後按「確認並送出」。沒有新日期時可按「僅開啟報表」。
+5. 在瀏覽器確認日誌及列印報表，完成後關閉瀏覽器。
+
+以下為離線示範模式的實際畫面：
+
+![Rust 登入介面](images/rust-login-ui.png)
+
+![Rust 日期多選介面](images/rust-dates-ui.png)
+
+## 測試
+
+```sh
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+```
+
+單元測試涵蓋民國日期、日期驗證、已有紀錄計數、假日/週末篩選、農曆跨年、閏年報表、設定檔相容讀寫及計畫選擇。
+
+實際瀏覽器整合測試預設略過，需額外執行：
+
+```sh
+cargo test --locked --test browser_flow -- --ignored
+```
+
+這項測試使用 headless 瀏覽器及 `127.0.0.1` 本機測試網頁，驗證登入、iframe、計畫切換後才讀取紀錄、避免重複、固定工作內容、送出確認及報表日期，**不連線中興大學網站**。預設使用 Edge；可透過 `NCHU_TEST_BROWSER=Chrome` 或 `Firefox` 更換瀏覽器。Windows PowerShell 範例：
+
+```powershell
+$env:NCHU_TEST_BROWSER = "Chrome"
+cargo test --locked --test browser_flow -- --ignored
+```
+
+`NCHU_DRIVER_CACHE` 可覆寫 thirtyfour 的預設系統驅動快取目錄。
+
+## 建置與發佈
+
+```sh
+cargo build --release --locked
+```
+
+Windows 產物為 `target/release/nchu-diary-autofill.exe`；macOS / Linux 為 `target/release/nchu-diary-autofill`。執行時仍需已安裝的瀏覽器及相容的系統圖形函式庫。
+
+`.github/workflows/build.yml` 會在 PR 與推送時執行 Rust 檢查，並於 Windows、macOS、Linux 建置。推送 `v*` tag 時會將各平台產物附加至 GitHub Release；手動執行 workflow 可下載建置 artifacts。
+
+## 程式結構
+
+```text
+src/
+  main.rs       程式入口、命令列參數、桌面視窗
+  config.rs     舊版設定相容、讀寫及路徑
+  dates.rs      日期規則、民國日期、臺灣假日、報表區間
+  browser.rs    WebDriver、登入、計畫切換、填寫及報表
+  worker.rs     背景執行緒、命令與事件、取消及清理
+  gui.rs        登入、計畫選擇、多選日曆與進度畫面
+data/
+  taiwan_holidays.json
+tests/
+  browser_flow.rs
+  fixtures/     本機整合測試網頁
+```
+
+若從 C/C++ 開始學 Rust，可先讀不依賴 GUI 的 `dates.rs`，接著看 `config.rs` 的 `Result` 與序列化，再看 `worker.rs` 的 enum 訊息交換，最後看非同步 WebDriver 操作。
+
+## 臺灣假日資料
+
+內建資料涵蓋 **1912–2099**，由原專案使用的 **python-holidays 0.58** 匯出，沿用其 `Taiwan`、預設 PUBLIC 類別及補假規則；Rust 執行時不會呼叫 Python，也不需要連線假日服務。
+
+這是原版資料的快照，未自動套用後續假日規則變更。需要更新時應以新版 python-holidays 的相同設定重新產生資料、更新來源版本，並重跑日期與整合測試。資料來源與授權見 `THIRD_PARTY_NOTICES.md`。

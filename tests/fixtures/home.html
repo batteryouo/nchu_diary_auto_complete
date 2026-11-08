@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Local NCHU fixture</title>
+<script>
+if (!sessionStorage.getItem('initialized')) {
+    sessionStorage.setItem('logs:A', JSON.stringify([{date:'1151102',work:'Existing A'}]));
+    sessionStorage.setItem('logs:B', JSON.stringify([{date:'1151103',work:'Existing B'}]));
+    sessionStorage.setItem('initialized', 'yes');
+}
+</script>
+<a href="/logs?school=A" target="displayiframe">學習日誌</a>
+<a href="/report?school=A" target="displayiframe">學習日誌列印</a>
+<iframe id="displayiframe" name="displayiframe" title="日誌" src="/logs?school=A"></iframe></html>

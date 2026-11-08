@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Local logs</title>
+<select name="schno" onchange="location.href='/logs?school='+this.value">
+<option value="">選擇</option><option value="A">計畫 A</option><option value="B">計畫 B</option></select>
+<form id="entry"><input id="date"><textarea id="work"></textarea><button id="btnSent">送出</button></form>
+<table id="records"></table>
+<script>
+const school = new URLSearchParams(location.search).get('school') || 'A';
+document.querySelector('[name=schno]').value = school;
+const records = JSON.parse(sessionStorage.getItem('logs:'+school) || '[]');
+for (const record of records) {
+    const row = document.getElementById('records').insertRow();
+    const cell = row.insertCell(); cell.className='footable-first-column'; cell.textContent=record.date;
+}
+document.getElementById('entry').onsubmit = event => {
+    event.preventDefault();
+    records.push({date:document.getElementById('date').value,work:document.getElementById('work').value});
+    sessionStorage.setItem('logs:'+school, JSON.stringify(records));
+    location.href='/logs?school='+school;
+};
+</script></html>

@@ -1,0 +1,3 @@
+[build]
+# GUI crates can exhaust memory with Cargo's CPU-count default on Windows.
+jobs = 2

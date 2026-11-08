@@ -70,6 +70,7 @@ cargo build --release --locked --bins
 ```json
 {
   "job_id": "discord-user-123-task-456",
+  "operation": "fill",
   "id": "登入帳號",
   "password": "登入密碼",
   "school": "115B1040",
@@ -83,9 +84,21 @@ cargo build --release --locked --bins
 }
 ```
 
-`school`、`year`、`month`、`target_days`、篩選條件、`browser` 與 `output_pdf` 都可省略；省略時分別使用帳號唯一計畫、當月、15 天、跳過週末與假日、自動尋找 Edge/Chrome/Firefox，以及 `reports/` 下的預設檔名。日期不會選到今天之後；若帳號有多個計畫，必須傳入 `school`。
+`operation` 可省略，預設為 `fill`。`school`、`year`、`month`、`target_days`、篩選條件、`browser` 與 `output_pdf` 都可省略；省略時分別使用帳號唯一計畫、當月、15 天、跳過週末與假日、自動尋找 Edge/Chrome/Firefox，以及 `reports/` 下的預設檔名。日期不會選到今天之後；若帳號有多個計畫，必須傳入 `school`。
 
-每行事件都有 `type`：`progress` 表示目前階段、`done` 表示 PDF 已完成並含 `pdf_path`、`error` 表示失敗並含 `code` 與 `message`。程序結束碼為 0（成功）、1（自動化或網站錯誤）、2（JSON/request 格式錯誤）。Bot 可逐行讀取 stdout，完成時把 `done.pdf_path` 作為 ephemeral attachment 回傳，錯誤則把 `error.message` 顯示給使用者並保留伺服器端日誌。
+若 Bot 需要讓使用者先選擇校內編號，可先送出 `operation: "list_schools"`：程序只登入並回傳 `schools` 事件，不會填寫任何日誌。例如：
+
+```json
+{
+  "operation": "list_schools",
+  "job_id": "discord-user-123-task-456",
+  "id": "登入帳號",
+  "password": "登入密碼",
+  "browser": "Chrome"
+}
+```
+
+回傳事件格式為 `{"type":"schools","job_id":"...","schools":[{"value":"115B1040","label":"電機工程學系"}]}`。Bot 顯示清單讓使用者選擇後，再用選定的 `school` 送出 `fill` request。每行事件都有 `type`：`progress` 表示目前階段、`schools` 表示可選計畫、`done` 表示 PDF 已完成並含 `pdf_path`、`error` 表示失敗並含 `code` 與 `message`。程序結束碼為 0（成功）、1（自動化或網站錯誤）、2（JSON/request 格式錯誤）。Bot 可逐行讀取 stdout，完成時把 `done.pdf_path` 作為 ephemeral attachment 回傳，錯誤則把 `error.message` 顯示給使用者並保留伺服器端日誌。
 
 PowerShell 最小範例：
 

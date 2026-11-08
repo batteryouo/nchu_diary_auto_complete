@@ -5,7 +5,7 @@ use chrono::{Datelike, Local};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    browser::{BrowserSession, LOGIN_URL, preferred_school},
+    browser::{BrowserSession, LOGIN_URL, School, preferred_school},
     config::Config,
     dates::{Month, SelectionRules, TaiwanHolidays, auto_select, submission_dates},
 };
@@ -18,6 +18,7 @@ use crate::{
 #[serde(default)]
 pub struct HeadlessRequest {
     pub job_id: Option<String>,
+    pub operation: HeadlessOperation,
     pub id: String,
     #[serde(alias = "pw")]
     pub password: String,
@@ -33,12 +34,39 @@ pub struct HeadlessRequest {
     pub output_pdf: Option<PathBuf>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeadlessOperation {
+    #[default]
+    Fill,
+    ListSchools,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct HeadlessSchool {
+    pub value: String,
+    pub label: String,
+}
+
+impl From<School> for HeadlessSchool {
+    fn from(school: School) -> Self {
+        Self {
+            value: school.value,
+            label: school.label,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HeadlessEvent {
     Progress {
         job_id: Option<String>,
         message: String,
+    },
+    Schools {
+        job_id: Option<String>,
+        schools: Vec<HeadlessSchool>,
     },
     Done {
         job_id: Option<String>,
@@ -105,12 +133,7 @@ pub async fn run(request: HeadlessRequest, emit: impl Fn(HeadlessEvent)) -> Resu
         });
     };
 
-    let session = if let Some(browser) = request.browser.as_deref() {
-        progress(format!("正在啟動 {browser} headless 瀏覽器…"));
-        BrowserSession::launch_named(browser, true).await?
-    } else {
-        BrowserSession::launch_headless(&mut progress).await?
-    };
+    let session = launch_session(request.browser.as_deref(), &mut progress).await?;
     let options = RunOptions {
         requested_school: request.school,
         month,
@@ -121,6 +144,51 @@ pub async fn run(request: HeadlessRequest, emit: impl Fn(HeadlessEvent)) -> Resu
     let result = run_with_session(&session, &config, options, &mut progress).await;
     session.close().await;
     result
+}
+
+/// Log in and return the plan units without submitting any diary records.
+///
+/// This is intended for Discord flows where the user chooses a plan unit after
+/// seeing the options returned by the website.
+pub async fn list_schools(
+    request: HeadlessRequest,
+    emit: impl Fn(HeadlessEvent),
+) -> Result<Vec<HeadlessSchool>> {
+    ensure!(!request.id.trim().is_empty(), "登入帳號不可空白");
+    ensure!(!request.password.is_empty(), "登入密碼不可空白");
+
+    let job_id = request.job_id.clone();
+    let mut progress = |message: String| {
+        emit(HeadlessEvent::Progress {
+            job_id: job_id.clone(),
+            message,
+        });
+    };
+    let session = launch_session(request.browser.as_deref(), &mut progress).await?;
+    progress("正在登入並讀取計畫單位…".into());
+    let config = Config {
+        id: request.id,
+        pw: request.password,
+        ..Default::default()
+    };
+    let result = session
+        .login(&config, LOGIN_URL)
+        .await
+        .map(|schools| schools.into_iter().map(HeadlessSchool::from).collect());
+    session.close().await;
+    result
+}
+
+async fn launch_session(
+    browser: Option<&str>,
+    progress: &mut impl FnMut(String),
+) -> Result<BrowserSession> {
+    if let Some(browser) = browser {
+        progress(format!("正在啟動 {browser} headless 瀏覽器…"));
+        BrowserSession::launch_named(browser, true).await
+    } else {
+        BrowserSession::launch_headless(progress).await
+    }
 }
 
 async fn run_with_session(
@@ -226,6 +294,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(request.job_id.as_deref(), Some("job-1"));
+        assert!(matches!(request.operation, HeadlessOperation::Fill));
         assert_eq!(request.password, "secret");
         assert_eq!(request.target_days, None);
         assert_eq!(request.skip_weekends, None);
@@ -240,5 +309,28 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains(r#""type":"progress""#));
         assert!(json.contains(r#""job_id":"job-1""#));
+    }
+
+    #[test]
+    fn request_accepts_school_listing_operation() {
+        let request: HeadlessRequest =
+            serde_json::from_str(r#"{"operation":"list_schools","id":"A123","password":"secret"}"#)
+                .unwrap();
+        assert!(matches!(request.operation, HeadlessOperation::ListSchools));
+    }
+
+    #[test]
+    fn school_event_contains_values_and_labels() {
+        let event = HeadlessEvent::Schools {
+            job_id: Some("job-1".into()),
+            schools: vec![HeadlessSchool {
+                value: "115B1040".into(),
+                label: "電機工程學系".into(),
+            }],
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains(r#""type":"schools""#));
+        assert!(json.contains("115B1040"));
+        assert!(json.contains("電機工程學系"));
     }
 }

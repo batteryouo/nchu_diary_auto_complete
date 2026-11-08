@@ -3,7 +3,9 @@ use std::{
     process::ExitCode,
 };
 
-use nchu_diary_autofill::headless::{HeadlessEvent, HeadlessRequest, run};
+use nchu_diary_autofill::headless::{
+    HeadlessEvent, HeadlessOperation, HeadlessRequest, list_schools, run,
+};
 
 fn write_event(event: HeadlessEvent) {
     let stdout = io::stdout();
@@ -16,7 +18,7 @@ fn write_event(event: HeadlessEvent) {
 
 fn print_help() {
     eprintln!(
-        "NCHU Diary AutoFill headless API\n\n用法：將單一 JSON request 從 stdin 傳入，stdout 會輸出 JSON Lines 事件。\n\n範例：\n  Get-Content request.json -Raw | nchu-diary-headless.exe\n\nrequest 欄位：id、password（或 pw）、school、year、month、target_days、\nskip_weekends、skip_holidays、browser、output_pdf。"
+        "NCHU Diary AutoFill headless API\n\n用法：將單一 JSON request 從 stdin 傳入，stdout 會輸出 JSON Lines 事件。\n\n範例：\n  Get-Content request.json -Raw | nchu-diary-headless.exe\n\nrequest 欄位：operation（fill 或 list_schools）、id、password（或 pw）、\nschool、year、month、target_days、skip_weekends、skip_holidays、\nbrowser、output_pdf。operation 預設為 fill；list_schools 只登入並回傳計畫清單。"
     );
 }
 
@@ -51,26 +53,42 @@ async fn main() -> ExitCode {
         }
     };
     let job_id = request.job_id.clone();
-    match run(request, write_event).await {
-        Ok(result) => {
-            write_event(HeadlessEvent::Done {
-                job_id,
-                school: result.school,
-                year: result.year,
-                month: result.month,
-                submitted: result.submitted,
-                skipped: result.skipped,
-                pdf_path: result.pdf_path,
-            });
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            write_event(HeadlessEvent::Error {
-                job_id,
-                code: "HEADLESS_ERROR".into(),
-                message: format!("{error:#}"),
-            });
-            ExitCode::from(1)
-        }
+    match request.operation {
+        HeadlessOperation::ListSchools => match list_schools(request, write_event).await {
+            Ok(schools) => {
+                write_event(HeadlessEvent::Schools { job_id, schools });
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                write_event(HeadlessEvent::Error {
+                    job_id,
+                    code: "HEADLESS_ERROR".into(),
+                    message: format!("{error:#}"),
+                });
+                ExitCode::from(1)
+            }
+        },
+        HeadlessOperation::Fill => match run(request, write_event).await {
+            Ok(result) => {
+                write_event(HeadlessEvent::Done {
+                    job_id,
+                    school: result.school,
+                    year: result.year,
+                    month: result.month,
+                    submitted: result.submitted,
+                    skipped: result.skipped,
+                    pdf_path: result.pdf_path,
+                });
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                write_event(HeadlessEvent::Error {
+                    job_id,
+                    code: "HEADLESS_ERROR".into(),
+                    message: format!("{error:#}"),
+                });
+                ExitCode::from(1)
+            }
+        },
     }
 }

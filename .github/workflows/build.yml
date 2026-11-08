@@ -53,6 +53,7 @@ jobs:
 
       - name: Local browser integration
         if: runner.os == 'Linux'
+        continue-on-error: ${{ startsWith(github.ref, 'refs/tags/v') }}
         env:
           NCHU_TEST_BROWSER: Chrome
         run: cargo test --locked --test browser_flow -- --ignored

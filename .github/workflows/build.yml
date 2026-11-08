@@ -19,12 +19,18 @@ jobs:
           - os: windows-latest
             build_path: target/release/nchu-diary-autofill.exe
             asset_name: NCHU_Diary_AutoFill-windows.exe
+            headless_path: target/release/nchu-diary-headless.exe
+            headless_asset_name: NCHU_Diary_Headless-windows.exe
           - os: macos-latest
             build_path: target/release/nchu-diary-autofill
             asset_name: NCHU_Diary_AutoFill-macos
+            headless_path: target/release/nchu-diary-headless
+            headless_asset_name: NCHU_Diary_Headless-macos
           - os: ubuntu-latest
             build_path: target/release/nchu-diary-autofill
             asset_name: NCHU_Diary_AutoFill-linux
+            headless_path: target/release/nchu-diary-headless
+            headless_asset_name: NCHU_Diary_Headless-linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -59,17 +65,20 @@ jobs:
         run: cargo test --locked --test browser_flow -- --ignored
 
       - name: Build executable
-        run: cargo build --release --locked
+        run: cargo build --release --locked --bins
 
       - name: Rename build output
         shell: bash
-        run: cp "${{ matrix.build_path }}" "${{ matrix.asset_name }}"
+        run: |
+          cp "${{ matrix.build_path }}" "${{ matrix.asset_name }}"
+          cp "${{ matrix.headless_path }}" "${{ matrix.headless_asset_name }}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
           path: |
             ${{ matrix.asset_name }}
+            ${{ matrix.headless_asset_name }}
             LICENSE
             THIRD_PARTY_NOTICES.md
 
@@ -89,6 +98,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/NCHU_Diary_AutoFill-*
+            release/NCHU_Diary_*
             LICENSE
             THIRD_PARTY_NOTICES.md

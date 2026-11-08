@@ -55,6 +55,47 @@ cargo run --locked -- --demo
 
 示範模式預填虛擬帳密及兩個計畫，可以操作登入、計畫選擇、日曆及完成畫面；不連線學校網站、不寫設定檔，也不會新增真實日誌。
 
+### Headless / Bot API
+
+專案另外提供 `nchu-diary-headless` 命令列執行檔，給 Discord Bot 或其他後端服務呼叫。它不開啟 GUI，從標準輸入讀取一個 JSON request，並以 JSON Lines 從標準輸出回報進度；帳號密碼只存在這次程序記憶體，不會寫入 `config.json`，也不會出現在事件內容。
+
+建置所有執行檔：
+
+```sh
+cargo build --release --locked --bins
+```
+
+執行檔位置為 `target/release/nchu-diary-headless.exe`（Windows）或 `target/release/nchu-diary-headless`（macOS / Linux）。request 欄位如下：
+
+```json
+{
+  "job_id": "discord-user-123-task-456",
+  "id": "登入帳號",
+  "password": "登入密碼",
+  "school": "115B1040",
+  "year": 2026,
+  "month": 11,
+  "target_days": 15,
+  "skip_weekends": true,
+  "skip_holidays": true,
+  "browser": "Edge",
+  "output_pdf": "reports/learning-log_115B1040_2026-11.pdf"
+}
+```
+
+`school`、`year`、`month`、`target_days`、篩選條件、`browser` 與 `output_pdf` 都可省略；省略時分別使用帳號唯一計畫、當月、15 天、跳過週末與假日、自動尋找 Edge/Chrome/Firefox，以及 `reports/` 下的預設檔名。日期不會選到今天之後；若帳號有多個計畫，必須傳入 `school`。
+
+每行事件都有 `type`：`progress` 表示目前階段、`done` 表示 PDF 已完成並含 `pdf_path`、`error` 表示失敗並含 `code` 與 `message`。程序結束碼為 0（成功）、1（自動化或網站錯誤）、2（JSON/request 格式錯誤）。Bot 可逐行讀取 stdout，完成時把 `done.pdf_path` 作為 ephemeral attachment 回傳，錯誤則把 `error.message` 顯示給使用者並保留伺服器端日誌。
+
+PowerShell 最小範例：
+
+```powershell
+$request = @{ id = "..."; password = "..."; school = "115B1040" } | ConvertTo-Json
+$request | .\target\release\nchu-diary-headless.exe
+```
+
+Python Bot 可用 `subprocess.Popen` 將 `json.dumps(request)` 寫入 stdin，再以 `for line in process.stdout` 即時解析事件；不要把密碼放在命令列參數或 Discord 訊息內容。
+
 ### 使用流程
 
 1. 輸入身分證字號及出生年月日（例如 `900928`），需要換計畫時勾選「重新選擇計畫單位」。
@@ -112,6 +153,7 @@ src/
   config.rs     舊版設定相容、讀寫及路徑
   dates.rs      日期規則、民國日期、臺灣假日、報表區間
   browser.rs    WebDriver、登入、計畫切換、填寫及報表
+  headless.rs   無 GUI 自動化流程與 Bot JSON 事件介面
   worker.rs     背景執行緒、命令與事件、取消及清理
   gui.rs        登入、計畫選擇、多選日曆與進度畫面
 data/

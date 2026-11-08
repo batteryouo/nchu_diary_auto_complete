@@ -47,10 +47,19 @@ pub struct BrowserSession {
 impl BrowserSession {
     /// Drivers are resolved/downloaded by thirtyfour; no Python/Selenium server is required.
     pub async fn launch(mut progress: impl FnMut(String)) -> Result<Self> {
+        Self::launch_with_mode(false, &mut progress).await
+    }
+
+    /// Launch a browser without opening a visible window. Used by the headless API and tests.
+    pub async fn launch_headless(mut progress: impl FnMut(String)) -> Result<Self> {
+        Self::launch_with_mode(true, &mut progress).await
+    }
+
+    async fn launch_with_mode(headless: bool, progress: &mut impl FnMut(String)) -> Result<Self> {
         let mut failures = Vec::new();
         for name in ["Edge", "Chrome", "Firefox"] {
             progress(format!("正在啟動 {name}（首次使用需下載驅動程式）…"));
-            match Self::launch_named(name, false).await {
+            match Self::launch_named(name, headless).await {
                 Ok(session) => return Ok(session),
                 Err(error) => {
                     progress(format!("{name} 無法啟動，嘗試下一個瀏覽器。"));
@@ -66,8 +75,9 @@ impl BrowserSession {
 
     /// Also used by the local integration test; headless sessions never touch the school site.
     pub async fn launch_named(name: &str, headless: bool) -> Result<Self> {
-        let capabilities: Capabilities = match name {
-            "Edge" => {
+        let normalized_name = name.trim().to_ascii_lowercase();
+        let capabilities: Capabilities = match normalized_name.as_str() {
+            "edge" => {
                 let mut caps = DesiredCapabilities::edge();
                 caps.add_arg(if headless {
                     "--headless=new"
@@ -76,7 +86,7 @@ impl BrowserSession {
                 })?;
                 caps.into()
             }
-            "Chrome" => {
+            "chrome" => {
                 let mut caps = DesiredCapabilities::chrome();
                 caps.add_arg(if headless {
                     "--headless=new"
@@ -85,7 +95,7 @@ impl BrowserSession {
                 })?;
                 caps.into()
             }
-            "Firefox" => {
+            "firefox" => {
                 let mut caps = DesiredCapabilities::firefox();
                 if headless {
                     caps.add_arg("-headless")?;
